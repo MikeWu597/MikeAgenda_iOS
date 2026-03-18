@@ -8,6 +8,7 @@
     <link href="/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         body { margin: 0; background: #f5f7fa; }
+        html.dark body { background: #0a0a0a; }
         #app { max-width: 860px; margin: 0 auto; padding: 18px; }
         .page-title { display:flex; align-items:center; gap:10px; font-size:20px; font-weight:700; margin:0; }
         .muted { color: #909399; font-size: 12px; }
@@ -38,23 +39,23 @@
                     <el-divider content-position="left">连接配置</el-divider>
 
                     <el-form-item label="服务器地址">
-                        <el-input v-model="connForm.domain" placeholder="例如 https://agenda.example.com" />
-                    </el-form-item>
-                    <el-form-item label="账户名">
-                        <el-input v-model="connForm.username" placeholder="请输入账户名" />
-                    </el-form-item>
-                    <el-form-item label="密码">
-                        <el-input v-model="connForm.password" type="password" show-password placeholder="请输入密码" />
+                        <el-input :model-value="connForm.domain" readonly />
                     </el-form-item>
                     <el-form-item>
-                        <el-button type="primary" :loading="savingConn" @click="saveConnection">
-                            <i class="bi bi-save"></i>
-                            <span style="margin-left: 6px;">保存连接配置</span>
-                        </el-button>
                         <el-button type="danger" @click="clearConnection">
                             <i class="bi bi-trash"></i>
                             <span style="margin-left: 6px;">清除连接</span>
                         </el-button>
+                    </el-form-item>
+
+                    <el-divider content-position="left">外观</el-divider>
+
+                    <el-form-item label="颜色模式">
+                        <el-radio-group v-model="form.colorMode" @change="saveColorMode">
+                            <el-radio value="light">浅色</el-radio>
+                            <el-radio value="dark">深色</el-radio>
+                            <el-radio value="system">适配系统</el-radio>
+                        </el-radio-group>
                     </el-form-item>
 
                     <el-divider content-position="left">客户端</el-divider>
@@ -138,6 +139,7 @@
                     savingImage: false,
                     savingConn: false,
                     form: {
+                        colorMode: 'system',
                         refreshInterval: null,
                         isTeaching: false,
                         imageLimit: null
@@ -161,6 +163,22 @@
                         return null;
                     }
                     return session;
+                },
+                loadColorMode() {
+                    try {
+                        this.form.colorMode = localStorage.getItem('__mikeagenda_colorMode') || 'system';
+                    } catch (e) {
+                        this.form.colorMode = 'system';
+                    }
+                },
+                saveColorMode(val) {
+                    try {
+                        localStorage.setItem('__mikeagenda_colorMode', val);
+                    } catch (e) {}
+                    if (window.__mikeagenda_applyColorMode) {
+                        window.__mikeagenda_applyColorMode(val);
+                    }
+                    ElementPlus.ElMessage.success('颜色模式已保存');
                 },
                 loadRefreshIntervalFromCookie() {
                     const raw = getCookie('refreshInterval');
@@ -357,6 +375,7 @@
                 async reload() {
                     this.loading = true;
                     try {
+                        this.loadColorMode();
                         this.loadRefreshIntervalFromCookie();
                         this.loadConnectionConfig();
                         await this.fetchTeachingMode();

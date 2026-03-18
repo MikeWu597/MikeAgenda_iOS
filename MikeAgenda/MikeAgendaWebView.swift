@@ -48,6 +48,8 @@ struct MikeAgendaWebView: UIViewRepresentable {
         webView.scrollView.contentInsetAdjustmentBehavior = .automatic
         webView.scrollView.maximumZoomScale = 1.0
         webView.scrollView.minimumZoomScale = 1.0
+        webView.scrollView.delegate = context.coordinator
+        webView.scrollView.isMultipleTouchEnabled = false
 
         context.coordinator.attach(webView: webView)
         context.coordinator.loadEntryPage()
@@ -60,7 +62,7 @@ struct MikeAgendaWebView: UIViewRepresentable {
 }
 
 extension MikeAgendaWebView {
-    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, UIScrollViewDelegate {
         static let cookieHandlerName = "mikeAgendaCookie"
         static let configHandlerName = "mikeAgendaConfig"
 
@@ -218,9 +220,56 @@ extension MikeAgendaWebView {
                         .el-select, .el-dropdown-menu, .el-dialog, .el-message-box {
                             font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif !important;
                         }
+                        html.dark body { background: #0a0a0a; color: #E5EAF3; }
                     `;
                     (document.head || document.documentElement).appendChild(style);
                 };
+
+                const getColorMode = () => {
+                    try {
+                        return localStorage.getItem('__mikeagenda_colorMode') || 'system';
+                    } catch (e) {
+                        return 'system';
+                    }
+                };
+
+                const applyColorMode = (mode) => {
+                    const html = document.documentElement;
+                    let dark = false;
+                    if (mode === 'dark') {
+                        dark = true;
+                    } else if (mode === 'light') {
+                        dark = false;
+                    } else {
+                        dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    }
+
+                    if (dark) {
+                        html.classList.add('dark');
+                    } else {
+                        html.classList.remove('dark');
+                    }
+
+                    if (dark && !document.querySelector('link[data-mikeagenda-dark]')) {
+                        const link = document.createElement('link');
+                        link.rel = 'stylesheet';
+                        link.href = '/vendor/element-plus/theme-chalk/dark/css-vars.css';
+                        link.setAttribute('data-mikeagenda-dark', 'true');
+                        (document.head || document.documentElement).appendChild(link);
+                    }
+                };
+
+                const mode = getColorMode();
+                applyColorMode(mode);
+
+                if (mode === 'system' && window.matchMedia) {
+                    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+                        const currentMode = getColorMode();
+                        if (currentMode === 'system') applyColorMode('system');
+                    });
+                }
+
+                window.__mikeagenda_applyColorMode = applyColorMode;
 
                 if (document.readyState === 'loading') {
                     document.addEventListener('DOMContentLoaded', applyTypography, { once: true });
@@ -233,6 +282,14 @@ extension MikeAgendaWebView {
 
         func attach(webView: WKWebView) {
             self.webView = webView
+        }
+
+        func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+            nil
+        }
+
+        func scrollViewDidZoom(_ scrollView: UIScrollView) {
+            scrollView.zoomScale = 1.0
         }
 
         func update(profile: ConnectionProfile) {
