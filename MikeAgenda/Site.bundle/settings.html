@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>设置</title>
     <link href="/vendor/element-plus/index.css" rel="stylesheet">
     <link href="/font/bootstrap-icons.css" rel="stylesheet">
@@ -35,6 +35,28 @@
 
             <div v-loading="loading">
                 <el-form label-width="140px" style="max-width: 680px;">
+                    <el-divider content-position="left">连接配置</el-divider>
+
+                    <el-form-item label="服务器地址">
+                        <el-input v-model="connForm.domain" placeholder="例如 https://agenda.example.com" />
+                    </el-form-item>
+                    <el-form-item label="账户名">
+                        <el-input v-model="connForm.username" placeholder="请输入账户名" />
+                    </el-form-item>
+                    <el-form-item label="密码">
+                        <el-input v-model="connForm.password" type="password" show-password placeholder="请输入密码" />
+                    </el-form-item>
+                    <el-form-item>
+                        <el-button type="primary" :loading="savingConn" @click="saveConnection">
+                            <i class="bi bi-save"></i>
+                            <span style="margin-left: 6px;">保存连接配置</span>
+                        </el-button>
+                        <el-button type="danger" @click="clearConnection">
+                            <i class="bi bi-trash"></i>
+                            <span style="margin-left: 6px;">清除连接</span>
+                        </el-button>
+                    </el-form-item>
+
                     <el-divider content-position="left">客户端</el-divider>
 
                     <el-form-item label="刷新间隔（秒）">
@@ -114,10 +136,16 @@
                     loading: false,
                     savingTeaching: false,
                     savingImage: false,
+                    savingConn: false,
                     form: {
                         refreshInterval: null,
                         isTeaching: false,
                         imageLimit: null
+                    },
+                    connForm: {
+                        domain: '',
+                        username: '',
+                        password: ''
                     }
                 };
             },
@@ -283,10 +311,54 @@
                         this.savingImage = false;
                     }
                 },
+                loadConnectionConfig() {
+                    const initial = window.__mikeagenda_profile || {};
+                    this.connForm.domain = initial.domain || '';
+                    this.connForm.username = initial.username || '';
+                    this.connForm.password = initial.password || '';
+                },
+                saveConnection() {
+                    if (!this.connForm.domain.trim()) {
+                        ElementPlus.ElMessage.warning('请输入服务器地址');
+                        return;
+                    }
+                    if (!this.connForm.username.trim()) {
+                        ElementPlus.ElMessage.warning('请输入账户名');
+                        return;
+                    }
+                    if (!this.connForm.password) {
+                        ElementPlus.ElMessage.warning('请输入密码');
+                        return;
+                    }
+                    this.savingConn = true;
+                    try {
+                        window.webkit.messageHandlers.mikeAgendaConfig.postMessage({
+                            action: 'save',
+                            domain: this.connForm.domain.trim(),
+                            username: this.connForm.username.trim(),
+                            password: this.connForm.password
+                        });
+                        ElementPlus.ElMessage.success('连接配置已保存，正在重新加载…');
+                    } catch (e) {
+                        ElementPlus.ElMessage.error('保存失败: ' + e.message);
+                    } finally {
+                        this.savingConn = false;
+                    }
+                },
+                clearConnection() {
+                    ElementPlus.ElMessageBox.confirm('确认清除连接配置？这将返回初始设置页面。', '确认', {
+                        confirmButtonText: '确认',
+                        cancelButtonText: '取消',
+                        type: 'warning'
+                    }).then(() => {
+                        window.webkit.messageHandlers.mikeAgendaConfig.postMessage({ action: 'clear' });
+                    }).catch(() => {});
+                },
                 async reload() {
                     this.loading = true;
                     try {
                         this.loadRefreshIntervalFromCookie();
+                        this.loadConnectionConfig();
                         await this.fetchTeachingMode();
                         await this.fetchImageLimit();
                     } finally {

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>配置连接</title>
+    <link href="/vendor/element-plus/index.css" rel="stylesheet">
+    <link href="/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { margin: 0; background: #f5f7fa; }
+        .setup-container {
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; padding: 24px; box-sizing: border-box;
+        }
+        .setup-card { width: 100%; max-width: 420px; }
+        .setup-title { text-align: center; font-size: 22px; font-weight: 700; margin: 0 0 6px; }
+        .setup-subtitle { text-align: center; color: #909399; font-size: 13px; margin: 0 0 24px; }
+        .resolved-url { color: #909399; font-size: 12px; margin-top: 4px; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="setup-container">
+            <el-card class="setup-card" shadow="always">
+                <h1 class="setup-title">配置 MikeAgenda</h1>
+                <p class="setup-subtitle">请填写服务端连接信息</p>
+                <el-form
+                    ref="formRef"
+                    :model="form"
+                    :rules="rules"
+                    label-position="top"
+                    @submit.prevent="handleSave"
+                >
+                    <el-form-item label="服务器地址" prop="domain">
+                        <el-input
+                            v-model="form.domain"
+                            placeholder="例如 https://agenda.example.com"
+                            :prefix-icon="Link"
+                            size="large"
+                        />
+                    </el-form-item>
+                    <el-form-item label="账户名" prop="username">
+                        <el-input
+                            v-model="form.username"
+                            placeholder="请输入账户名"
+                            :prefix-icon="User"
+                            size="large"
+                        />
+                    </el-form-item>
+                    <el-form-item label="密码" prop="password">
+                        <el-input
+                            v-model="form.password"
+                            type="password"
+                            placeholder="请输入密码"
+                            :prefix-icon="Lock"
+                            size="large"
+                            show-password
+                            @keyup.enter="handleSave"
+                        />
+                    </el-form-item>
+                    <div v-if="resolvedURL" class="resolved-url">将连接到 {{ resolvedURL }}</div>
+                    <el-button
+                        type="primary"
+                        size="large"
+                        style="width: 100%; margin-top: 16px;"
+                        :loading="saving"
+                        @click="handleSave"
+                    >
+                        保存并进入
+                    </el-button>
+                </el-form>
+            </el-card>
+        </div>
+    </div>
+
+    <script src="/vendor/vue/vue.global.prod.js"></script>
+    <script src="/vendor/element-plus/index.full.js"></script>
+    <script src="/vendor/element-plus-icons/icons-vue.iife.min.js"></script>
+    <script>
+        const { createApp, ref, reactive, computed } = Vue;
+        const { ElMessage } = ElementPlus;
+
+        createApp({
+            setup() {
+                const formRef = ref(null);
+                const saving = ref(false);
+
+                const initial = (window.__mikeagenda_profile) || {};
+                const form = reactive({
+                    domain: initial.domain || '',
+                    username: initial.username || '',
+                    password: initial.password || ''
+                });
+
+                const rules = {
+                    domain: [{ required: true, message: '请输入服务器地址', trigger: 'blur' }],
+                    username: [{ required: true, message: '请输入账户名', trigger: 'blur' }],
+                    password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
+                };
+
+                const resolvedURL = computed(() => {
+                    const raw = (form.domain || '').trim();
+                    if (!raw) return '';
+                    try {
+                        const candidate = raw.includes('://') ? raw : 'https://' + raw;
+                        const u = new URL(candidate);
+                        if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
+                        return u.origin;
+                    } catch { return ''; }
+                });
+
+                const handleSave = async () => {
+                    if (!formRef.value) return;
+                    await formRef.value.validate((valid) => {
+                        if (!valid) return;
+                        if (!resolvedURL.value) {
+                            ElMessage.error('地址格式无效');
+                            return;
+                        }
+                        saving.value = true;
+                        try {
+                            window.webkit.messageHandlers.mikeAgendaConfig.postMessage({
+                                action: 'save',
+                                domain: form.domain.trim(),
+                                username: form.username.trim(),
+                                password: form.password
+                            });
+                        } catch (e) {
+                            ElMessage.error('保存失败: ' + e.message);
+                            saving.value = false;
+                        }
+                    });
+                };
+
+                return {
+                    formRef, form, rules, saving, resolvedURL, handleSave,
+                    User: ElementPlusIconsVue.User,
+                    Lock: ElementPlusIconsVue.Lock,
+                    Link: ElementPlusIconsVue.Link
+                };
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>

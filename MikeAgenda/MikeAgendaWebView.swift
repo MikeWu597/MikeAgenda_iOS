@@ -4,14 +4,16 @@ import UniformTypeIdentifiers
 
 struct MikeAgendaWebView: UIViewRepresentable {
     let profile: ConnectionProfile
+    var onProfileChanged: (() -> Void)?
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(profile: profile)
+        Coordinator(profile: profile, onProfileChanged: onProfileChanged)
     }
 
     func makeUIView(context: Context) -> WKWebView {
         let userContentController = WKUserContentController()
         userContentController.add(context.coordinator, name: Coordinator.cookieHandlerName)
+        userContentController.add(context.coordinator, name: Coordinator.configHandlerName)
         userContentController.addUserScript(
             WKUserScript(
                 source: context.coordinator.cookieBootstrapScript,
@@ -26,6 +28,13 @@ struct MikeAgendaWebView: UIViewRepresentable {
                 forMainFrameOnly: false
             )
         )
+        userContentController.addUserScript(
+            WKUserScript(
+                source: context.coordinator.profileInjectionScript,
+                injectionTime: .atDocumentStart,
+                forMainFrameOnly: true
+            )
+        )
 
         let configuration = WKWebViewConfiguration()
         configuration.userContentController = userContentController
@@ -36,7 +45,9 @@ struct MikeAgendaWebView: UIViewRepresentable {
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
-        webView.scrollView.contentInsetAdjustmentBehavior = .never
+        webView.scrollView.contentInsetAdjustmentBehavior = .automatic
+        webView.scrollView.maximumZoomScale = 1.0
+        webView.scrollView.minimumZoomScale = 1.0
 
         context.coordinator.attach(webView: webView)
         context.coordinator.loadEntryPage()
@@ -51,14 +62,17 @@ struct MikeAgendaWebView: UIViewRepresentable {
 extension MikeAgendaWebView {
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
         static let cookieHandlerName = "mikeAgendaCookie"
+        static let configHandlerName = "mikeAgendaConfig"
 
         private(set) var profile: ConnectionProfile
         let schemeHandler: LocalSiteSchemeHandler
         private weak var webView: WKWebView?
         private var loadedToken: String?
+        private var onProfileChanged: (() -> Void)?
 
-        init(profile: ConnectionProfile) {
+        init(profile: ConnectionProfile, onProfileChanged: (() -> Void)?) {
             self.profile = profile
+            self.onProfileChanged = onProfileChanged
             self.schemeHandler = LocalSiteSchemeHandler(profile: profile)
         }
 
@@ -236,25 +250,64 @@ extension MikeAgendaWebView {
             }
 
             loadedToken = profile.reloadToken
-            webView.load(URLRequest(url: LocalSiteSchemeHandler.entryURL))
+
+            if profile.isComplete {
+                webView.load(URLRequest(url: LocalSiteSchemeHandler.entryURL))
+            } else {
+                webView.load(URLRequest(url: LocalSiteSchemeHandler.setupURL))
+            }
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-            guard message.name == Self.cookieHandlerName,
-                  let body = message.body as? [String: Any],
-                  let value = body["value"] as? String else {
+            if message.name == Self.cookieHandlerName,
+               let body = message.body as? [String: Any],
+               let value = body["value"] as? String {
+                ConnectionProfileStore.saveWebCookies(value)
                 return
             }
 
-            ConnectionProfileStore.saveWebCookies(value)
+            if message.name == Self.configHandlerName,
+               let body = message.body as? [String: Any],
+               let action = body["action"] as? String {
+                handleConfigMessage(action: action, body: body)
+                return
+            }
+        }
+
+        private func handleConfigMessage(action: String, body: [String: Any]) {
+            switch action {
+            case "save":
+                let newProfile = ConnectionProfile(
+                    domain: body["domain"] as? String ?? "",
+                    username: body["username"] as? String ?? "",
+                    password: body["password"] as? String ?? ""
+                )
+                let didChange = newProfile.reloadToken != profile.reloadToken
+                ConnectionProfileStore.save(newProfile)
+                if didChange {
+                    ConnectionProfileStore.clearWebCookies()
+                }
+                profile = ConnectionProfileStore.load()
+                schemeHandler.update(profile: profile)
+                loadedToken = nil
+                onProfileChanged?()
+            case "clear":
+                ConnectionProfileStore.clear()
+                profile = ConnectionProfile()
+                schemeHandler.update(profile: profile)
+                loadedToken = nil
+                onProfileChanged?()
+            default:
+                break
+            }
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            guard webView.url?.lastPathComponent.lowercased() == "login.html" else {
-                return
-            }
+            let page = webView.url?.lastPathComponent.lowercased() ?? ""
 
-            webView.evaluateJavaScript(prefillLoginScript)
+            if page == "login.html" {
+                webView.evaluateJavaScript(prefillLoginScript)
+            }
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -288,33 +341,42 @@ extension MikeAgendaWebView {
             (() => {
                 const username = \(username);
                 const password = \(password);
+                if (!username || !password) return;
 
-                const fillInput = (input, value) => {
-                    if (!input) {
-                        return false;
+                const tryLogin = () => {
+                    const appEl = document.getElementById('app');
+                    if (!appEl || !appEl.__vue_app__) {
+                        window.setTimeout(tryLogin, 100);
+                        return;
                     }
-                    input.focus();
-                    input.value = value;
-                    input.dispatchEvent(new Event('input', { bubbles: true }));
-                    input.dispatchEvent(new Event('change', { bubbles: true }));
-                    return true;
+
+                    const vm = appEl.__vue_app__._instance;
+                    if (!vm || !vm.setupState) {
+                        window.setTimeout(tryLogin, 100);
+                        return;
+                    }
+
+                    const state = vm.setupState;
+                    if (state.loginForm) {
+                        state.loginForm.username = username;
+                        state.loginForm.password = password;
+                    }
+
+                    if (typeof state.handleLogin === 'function') {
+                        window.setTimeout(() => state.handleLogin(), 50);
+                    }
                 };
 
-                const applyValues = () => {
-                    const inputs = Array.from(document.querySelectorAll('input'));
-                    const usernameInput = inputs.find((input) => input.type === 'text') || inputs.find((input) => (input.placeholder || '').includes('用户名'));
-                    const passwordInput = inputs.find((input) => input.type === 'password') || inputs.find((input) => (input.placeholder || '').includes('密码'));
-                    const userReady = fillInput(usernameInput, username);
-                    const passwordReady = fillInput(passwordInput, password);
-
-                    if (!userReady || !passwordReady) {
-                        window.setTimeout(applyValues, 120);
-                    }
-                };
-
-                applyValues();
+                tryLogin();
             })();
             """
+        }
+
+        var profileInjectionScript: String {
+            let domain = profile.trimmedDomain.jsEscapedLiteral
+            let username = profile.trimmedUsername.jsEscapedLiteral
+            let password = profile.password.jsEscapedLiteral
+            return "window.__mikeagenda_profile = { domain: \(domain), username: \(username), password: \(password) };"
         }
 
         private func handleLoadError(_ error: Error) {
@@ -332,7 +394,7 @@ extension MikeAgendaWebView {
             <body style='font-family:-apple-system;padding:24px;background:#f5f5f7;color:#1d1d1f;'>
                 <h2 style='margin:0 0 12px;'>无法加载页面</h2>
                 <p style='line-height:1.6;'>\(error.localizedDescription.htmlEscaped)</p>
-                <p style='line-height:1.6;color:#6e6e73;'>请点击右下角按钮检查连接设置。</p>
+                <p style='line-height:1.6;color:#6e6e73;'>请前往设置页面检查连接配置。</p>
             </body>
             </html>
             """
@@ -346,6 +408,7 @@ final class LocalSiteSchemeHandler: NSObject, WKURLSchemeHandler {
     static let scheme = "mikeagenda"
     static let host = "app"
     static let entryURL = URL(string: "\(scheme)://\(host)/")!
+    static let setupURL = URL(string: "\(scheme)://\(host)/setup.html")!
 
     private let session = URLSession(configuration: .default)
     private var profile: ConnectionProfile
