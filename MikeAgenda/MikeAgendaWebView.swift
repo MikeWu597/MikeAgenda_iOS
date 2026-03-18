@@ -5,15 +5,17 @@ import UniformTypeIdentifiers
 struct MikeAgendaWebView: UIViewRepresentable {
     let profile: ConnectionProfile
     var onProfileChanged: (() -> Void)?
+    var onColorModeChanged: ((String) -> Void)?
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(profile: profile, onProfileChanged: onProfileChanged)
+        Coordinator(profile: profile, onProfileChanged: onProfileChanged, onColorModeChanged: onColorModeChanged)
     }
 
     func makeUIView(context: Context) -> WKWebView {
         let userContentController = WKUserContentController()
         userContentController.add(context.coordinator, name: Coordinator.cookieHandlerName)
         userContentController.add(context.coordinator, name: Coordinator.configHandlerName)
+        userContentController.add(context.coordinator, name: Coordinator.colorModeHandlerName)
         userContentController.addUserScript(
             WKUserScript(
                 source: context.coordinator.cookieBootstrapScript,
@@ -65,16 +67,19 @@ extension MikeAgendaWebView {
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, UIScrollViewDelegate {
         static let cookieHandlerName = "mikeAgendaCookie"
         static let configHandlerName = "mikeAgendaConfig"
+        static let colorModeHandlerName = "mikeAgendaColorMode"
 
         private(set) var profile: ConnectionProfile
         let schemeHandler: LocalSiteSchemeHandler
         private weak var webView: WKWebView?
         private var loadedToken: String?
         private var onProfileChanged: (() -> Void)?
+        private var onColorModeChanged: ((String) -> Void)?
 
-        init(profile: ConnectionProfile, onProfileChanged: (() -> Void)?) {
+        init(profile: ConnectionProfile, onProfileChanged: (() -> Void)?, onColorModeChanged: ((String) -> Void)?) {
             self.profile = profile
             self.onProfileChanged = onProfileChanged
+            self.onColorModeChanged = onColorModeChanged
             self.schemeHandler = LocalSiteSchemeHandler(profile: profile)
         }
 
@@ -233,7 +238,13 @@ extension MikeAgendaWebView {
                     }
                 };
 
-                const applyColorMode = (mode) => {
+                const notifyNative = (mode) => {
+                    try {
+                        window.webkit.messageHandlers.mikeAgendaColorMode.postMessage(mode);
+                    } catch (e) {}
+                };
+
+                const applyColorMode = (mode, notify) => {
                     const html = document.documentElement;
                     let dark = false;
                     if (mode === 'dark') {
@@ -257,12 +268,14 @@ extension MikeAgendaWebView {
                         link.setAttribute('data-mikeagenda-dark', 'true');
                         (document.head || document.documentElement).appendChild(link);
                     }
+
+                    if (notify !== false) notifyNative(mode);
                 };
 
                 const mode = getColorMode();
                 applyColorMode(mode);
 
-                if (mode === 'system' && window.matchMedia) {
+                if (window.matchMedia) {
                     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
                         const currentMode = getColorMode();
                         if (currentMode === 'system') applyColorMode('system');
@@ -309,10 +322,141 @@ extension MikeAgendaWebView {
             loadedToken = profile.reloadToken
 
             if profile.isComplete {
-                webView.load(URLRequest(url: LocalSiteSchemeHandler.entryURL))
+                showSplash()
+                attemptSilentLogin()
             } else {
                 webView.load(URLRequest(url: LocalSiteSchemeHandler.setupURL))
             }
+        }
+
+        private func showSplash() {
+            let colorMode = ConnectionProfileStore.loadColorMode()
+            let isDarkJS = colorMode == "dark" ? "true" : (colorMode == "system" ? "window.matchMedia('(prefers-color-scheme:dark)').matches" : "false")
+            let html = """
+            <!DOCTYPE html>
+            <html lang="zh-CN">
+            <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <style>
+                body {
+                    margin:0; display:flex; align-items:center; justify-content:center;
+                    height:100vh; font-family:-apple-system,PingFang SC,sans-serif;
+                }
+                body.dark { background:#0a0a0a; color:#E5EAF3; }
+                body.light { background:#f5f7fa; color:#1d1d1f; }
+                .spinner { width:28px; height:28px; border:3px solid rgba(128,128,128,0.25);
+                    border-top-color:rgba(128,128,128,0.8); border-radius:50%;
+                    animation:spin .7s linear infinite; margin-bottom:16px; }
+                @keyframes spin { to { transform:rotate(360deg); } }
+                .wrap { text-align:center; }
+                .msg { font-size:15px; opacity:0.7; }
+            </style>
+            </head>
+            <body>
+            <div class="wrap">
+                <div class="spinner" style="margin:0 auto 16px;"></div>
+                <div class="msg">登录中…</div>
+            </div>
+            <script>document.body.classList.add(\(isDarkJS) ? 'dark' : 'light');</script>
+            </body>
+            </html>
+            """
+            webView?.loadHTMLString(html, baseURL: LocalSiteSchemeHandler.entryURL)
+        }
+
+        private func attemptSilentLogin() {
+            guard let baseURL = profile.normalizedBaseURL else {
+                navigateToLogin()
+                return
+            }
+
+            // First check if existing session is still valid
+            if let existingSession = persistedSessionValue(), !existingSession.isEmpty {
+                var checkReq = URLRequest(url: baseURL.appendingPathComponent("api/getItems"))
+                checkReq.httpMethod = "GET"
+                checkReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                checkReq.setValue(existingSession, forHTTPHeaderField: "session")
+                checkReq.timeoutInterval = 10
+
+                URLSession.shared.dataTask(with: checkReq) { [weak self] data, response, error in
+                    guard let self else { return }
+                    let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                    if status != 401, let data,
+                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       json["success"] as? Bool == true {
+                        DispatchQueue.main.async {
+                            self.navigateToDash()
+                        }
+                    } else {
+                        self.performLogin()
+                    }
+                }.resume()
+                return
+            }
+
+            performLogin()
+        }
+
+        private func performLogin() {
+            guard let baseURL = profile.normalizedBaseURL,
+                  let loginURL = URL(string: baseURL.absoluteString + "/login") else {
+                DispatchQueue.main.async { self.navigateToLogin() }
+                return
+            }
+
+            var request = URLRequest(url: loginURL)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.timeoutInterval = 10
+
+            let body: [String: String] = [
+                "username": profile.trimmedUsername,
+                "password": profile.password
+            ]
+            request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+            URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+                guard let self else { return }
+
+                guard let data,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      json["success"] as? Bool == true,
+                      let session = json["session"] as? String,
+                      !session.isEmpty else {
+                    DispatchQueue.main.async { self.navigateToLogin() }
+                    return
+                }
+
+                ConnectionProfileStore.saveWebCookies("session=\(session)")
+                DispatchQueue.main.async {
+                    self.webView?.evaluateJavaScript("document.cookie='session=\(session); path=/; SameSite=Lax';")
+                    self.navigateToDash()
+                }
+            }.resume()
+        }
+
+        private func persistedSessionValue() -> String? {
+            let cookieString = ConnectionProfileStore.loadWebCookies()
+            for cookie in cookieString.split(separator: ";") {
+                let entry = cookie.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard let separator = entry.firstIndex(of: "=") else { continue }
+                let name = String(entry[..<separator]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if name == "session" {
+                    let valueIndex = entry.index(after: separator)
+                    return String(entry[valueIndex...]).removingPercentEncoding ?? String(entry[valueIndex...])
+                }
+            }
+            return nil
+        }
+
+        private func navigateToDash() {
+            guard let dashURL = URL(string: "\(LocalSiteSchemeHandler.scheme)://\(LocalSiteSchemeHandler.host)/dash.html") else { return }
+            webView?.load(URLRequest(url: dashURL))
+        }
+
+        private func navigateToLogin() {
+            webView?.load(URLRequest(url: LocalSiteSchemeHandler.entryURL))
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -327,6 +471,12 @@ extension MikeAgendaWebView {
                let body = message.body as? [String: Any],
                let action = body["action"] as? String {
                 handleConfigMessage(action: action, body: body)
+                return
+            }
+
+            if message.name == Self.colorModeHandlerName,
+               let mode = message.body as? String {
+                onColorModeChanged?(mode)
                 return
             }
         }
@@ -360,11 +510,6 @@ extension MikeAgendaWebView {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            let page = webView.url?.lastPathComponent.lowercased() ?? ""
-
-            if page == "login.html" {
-                webView.evaluateJavaScript(prefillLoginScript)
-            }
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {

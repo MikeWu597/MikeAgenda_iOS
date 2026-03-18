@@ -93,6 +93,16 @@ enum ConnectionProfileStore {
     static func clearWebCookies() {
         store.removeValue(forKey: webCookiesKey)
     }
+
+    private static let colorModeKey = "mikeagenda.colorMode"
+
+    static func loadColorMode() -> String {
+        store.value(forKey: colorModeKey) ?? "system"
+    }
+
+    static func saveColorMode(_ mode: String) {
+        store.setValue(mode, forKey: colorModeKey)
+    }
 }
 
 final class NativeStore {
