@@ -6,8 +6,13 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		04BF88422F69AD22006E4C2A /* Site.bundle in Resources */ = {isa = PBXBuildFile; fileRef = 04BF88412F69AD21006E4C2A /* Site.bundle */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		04BF882A2F69AD1B006E4C2A /* MikeAgenda.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MikeAgenda.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		04BF88412F69AD21006E4C2A /* Site.bundle */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.plug-in"; path = "MikeAgenda/Site.bundle"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -33,6 +38,7 @@
 			isa = PBXGroup;
 			children = (
 				04BF882C2F69AD1B006E4C2A /* MikeAgenda */,
+				04BF88412F69AD21006E4C2A /* Site.bundle */,
 				04BF882B2F69AD1B006E4C2A /* Products */,
 			);
 			sourceTree = "<group>";
@@ -109,6 +115,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				04BF88422F69AD22006E4C2A /* Site.bundle in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -19,6 +19,13 @@ struct MikeAgendaWebView: UIViewRepresentable {
                 forMainFrameOnly: false
             )
         )
+        userContentController.addUserScript(
+            WKUserScript(
+                source: context.coordinator.typographyBootstrapScript,
+                injectionTime: .atDocumentStart,
+                forMainFrameOnly: false
+            )
+        )
 
         let configuration = WKWebViewConfiguration()
         configuration.userContentController = userContentController
@@ -59,7 +66,19 @@ extension MikeAgendaWebView {
             let initialCookieString = ConnectionProfileStore.loadWebCookies().jsEscapedLiteral
             return """
             (() => {
-                const initialCookieString = \(initialCookieString);
+                const readWindowNameCookies = () => {
+                    const rawValue = String(window.name || '');
+                    const prefix = '__mikeagenda_cookies=';
+                    return rawValue.startsWith(prefix) ? rawValue.slice(prefix.length) : '';
+                };
+
+                const initialCookieString = (() => {
+                    try {
+                        return localStorage.getItem('__mikeagenda_cookies') || readWindowNameCookies() || \(initialCookieString);
+                    } catch (error) {
+                        return readWindowNameCookies() || \(initialCookieString);
+                    }
+                })();
                 const cookieMap = {};
 
                 const parseCookieString = (rawValue) => {
@@ -84,8 +103,17 @@ extension MikeAgendaWebView {
                     .join('; ');
 
                 const syncCookies = () => {
+                    const value = serializedCookies();
+
+                    try {
+                        localStorage.setItem('__mikeagenda_cookies', value);
+                    } catch (error) {
+                    }
+
+                    window.name = `__mikeagenda_cookies=${value}`;
+
                     window.webkit.messageHandlers.\(Self.cookieHandlerName).postMessage({
-                        value: serializedCookies()
+                        value: value
                     });
                 };
 
@@ -139,6 +167,7 @@ extension MikeAgendaWebView {
                 };
 
                 parseCookieString(initialCookieString);
+                syncCookies();
 
                 const cookieDescriptor = {
                     configurable: true,
@@ -159,6 +188,31 @@ extension MikeAgendaWebView {
                     } catch (innerError) {
                     }
                 }
+            })();
+            """
+        }
+
+        var typographyBootstrapScript: String {
+            """
+            (() => {
+                const applyTypography = () => {
+                    const style = document.createElement('style');
+                    style.setAttribute('data-mikeagenda-typography', 'true');
+                    style.textContent = `
+                        html, body, button, input, textarea, select, option,
+                        .el-button, .el-input__inner, .el-input__wrapper, .el-textarea__inner,
+                        .el-select, .el-dropdown-menu, .el-dialog, .el-message-box {
+                            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif !important;
+                        }
+                    `;
+                    (document.head || document.documentElement).appendChild(style);
+                };
+
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', applyTypography, { once: true });
+                }
+
+                applyTypography();
             })();
             """
         }
@@ -354,6 +408,12 @@ final class LocalSiteSchemeHandler: NSObject, WKURLSchemeHandler {
             request.setValue(value, forHTTPHeaderField: header)
         }
 
+        if request.value(forHTTPHeaderField: "session") == nil,
+           let persistedSession = persistedSessionValue(),
+           !persistedSession.isEmpty {
+            request.setValue(persistedSession, forHTTPHeaderField: "session")
+        }
+
         let task = session.dataTask(with: request) { [weak self] data, response, error in
             guard let self else {
                 return
@@ -375,6 +435,8 @@ final class LocalSiteSchemeHandler: NSObject, WKURLSchemeHandler {
             if headers["Content-Type"] == nil, let mimeType = remoteResponse?.mimeType {
                 headers["Content-Type"] = mimeType
             }
+
+            self.updatePersistedSession(for: urlSchemeTask.request.url, statusCode: statusCode, data: responseData)
 
             let httpResponse = HTTPURLResponse(
                 url: urlSchemeTask.request.url!,
@@ -437,6 +499,43 @@ final class LocalSiteSchemeHandler: NSObject, WKURLSchemeHandler {
         return components.url
     }
 
+    private func persistedSessionValue() -> String? {
+        let cookieString = ConnectionProfileStore.loadWebCookies()
+        for cookie in cookieString.split(separator: ";") {
+            let entry = cookie.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let separator = entry.firstIndex(of: "=") else {
+                continue
+            }
+
+            let name = String(entry[..<separator]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if name == "session" {
+                let valueIndex = entry.index(after: separator)
+                return String(entry[valueIndex...]).removingPercentEncoding ?? String(entry[valueIndex...])
+            }
+        }
+
+        return nil
+    }
+
+    private func updatePersistedSession(for requestURL: URL?, statusCode: Int, data: Data) {
+        guard let requestURL else {
+            return
+        }
+
+        if requestURL.path == "/login",
+           let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
+           (json["success"] as? Bool) == true,
+           let session = json["session"] as? String,
+           !session.isEmpty {
+            ConnectionProfileStore.saveWebCookies("session=\(session)")
+            return
+        }
+
+        if statusCode == 401 {
+            ConnectionProfileStore.clearWebCookies()
+        }
+    }
+
     private func localResourceURL(for requestURL: URL?) -> URL? {
         guard let requestURL,
               let bundleURL = Bundle.main.url(forResource: "Site", withExtension: "bundle") else {
@@ -464,23 +563,38 @@ final class LocalSiteSchemeHandler: NSObject, WKURLSchemeHandler {
     }
 
     private func mimeType(for fileURL: URL) -> String {
-        if let type = UTType(filenameExtension: fileURL.pathExtension),
-           let preferred = type.preferredMIMEType {
-            return preferred
-        }
-
         switch fileURL.pathExtension.lowercased() {
-        case "css":
-            return "text/css"
-        case "js":
-            return "text/javascript"
         case "html":
-            return "text/html"
-        case "svg":
-            return "image/svg+xml"
+            return "text/html; charset=utf-8"
+        case "css":
+            return "text/css; charset=utf-8"
+        case "js":
+            return "text/javascript; charset=utf-8"
         case "json":
-            return "application/json"
+            return "application/json; charset=utf-8"
+        case "svg":
+            return "image/svg+xml; charset=utf-8"
+        case "woff":
+            return "font/woff"
+        case "woff2":
+            return "font/woff2"
+        case "ttf":
+            return "font/ttf"
+        case "eot":
+            return "application/vnd.ms-fontobject"
+        case "png":
+            return "image/png"
+        case "jpg", "jpeg":
+            return "image/jpeg"
+        case "gif":
+            return "image/gif"
+        case "ico":
+            return "image/x-icon"
         default:
+            if let type = UTType(filenameExtension: fileURL.pathExtension),
+               let preferred = type.preferredMIMEType {
+                return preferred
+            }
             return "application/octet-stream"
         }
     }
