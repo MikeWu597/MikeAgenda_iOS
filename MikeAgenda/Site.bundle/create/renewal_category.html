@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新建续费分类</title>
+    <link href="/vendor/element-plus/index.css" rel="stylesheet">
+    <link href="/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 0; background: #f5f7fa; }
+        #app { min-height: 100vh; padding: 20px; }
+        .page-container { max-width: 760px; margin: 0 auto; }
+        .page-header {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px 18px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .page-title { font-size: 20px; font-weight: 700; color: #303133; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="page-container">
+            <div class="page-header">
+                <el-button circle @click="goBack" aria-label="返回">
+                    <i class="bi bi-arrow-left"></i>
+                </el-button>
+                <div class="page-title">新建续费分类</div>
+            </div>
+
+            <el-card shadow="hover" style="border-radius: 12px;">
+                <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+                    <el-form-item label="名称" prop="name">
+                        <el-input v-model="form.name" placeholder="请输入分类名称" clearable />
+                    </el-form-item>
+                    <el-form-item label="颜色" prop="color">
+                        <div style="display:flex; align-items:center; gap: 12px;">
+                            <el-color-picker v-model="form.color" />
+                            <el-input v-model="form.color" style="max-width: 180px;" placeholder="#RRGGBB" />
+                        </div>
+                    </el-form-item>
+                    <el-form-item label="备注">
+                        <el-input v-model="form.description" type="textarea" :rows="3" placeholder="可选" />
+                    </el-form-item>
+
+                    <el-form-item>
+                        <el-button type="primary" :loading="loading" @click="submit">创建</el-button>
+                        <el-button @click="goBack">取消</el-button>
+                    </el-form-item>
+                </el-form>
+            </el-card>
+        </div>
+    </div>
+
+    <script src="/vendor/vue/vue.global.prod.js"></script>
+    <script src="/vendor/element-plus/index.full.js"></script>
+    <script>
+        const { createApp, ref, reactive, onMounted } = Vue;
+        const { ElMessage } = ElementPlus;
+
+        createApp({
+            setup() {
+                const formRef = ref(null);
+                const loading = ref(false);
+                const form = reactive({
+                    name: '',
+                    color: '#409eff',
+                    description: ''
+                });
+
+                const rules = {
+                    name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
+                    color: [{ required: true, message: '请选择颜色', trigger: 'change' }]
+                };
+
+                const getSession = () => {
+                    const cookies = document.cookie.split(';');
+                    for (const cookie of cookies) {
+                        const [name, value] = cookie.trim().split('=');
+                        if (name === 'session') return decodeURIComponent(value);
+                    }
+                    return null;
+                };
+
+                const ensureAuth = () => {
+                    const session = getSession();
+                    if (!session) {
+                        window.location.href = '/login.html';
+                        return null;
+                    }
+                    return session;
+                };
+
+                const submit = async () => {
+                    if (!formRef.value) return;
+                    await formRef.value.validate(async (valid) => {
+                        if (!valid) return;
+                        const session = ensureAuth();
+                        if (!session) return;
+
+                        loading.value = true;
+                        try {
+                            const res = await fetch('/api/createRenewalCategories', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    name: form.name,
+                                    color: form.color,
+                                    description: form.description,
+                                    session
+                                })
+                            });
+                            if (res.status === 401) {
+                                window.location.href = '/login.html';
+                                return;
+                            }
+                            const data = await res.json();
+                            if (!data.success) throw new Error(data.message || '创建失败');
+                            ElMessage.success('分类已创建');
+                            setTimeout(() => (window.location.href = '/view/renewal_category.html'), 300);
+                        } catch (e) {
+                            console.error(e);
+                            ElMessage.error(e?.message || '创建失败');
+                        } finally {
+                            loading.value = false;
+                        }
+                    });
+                };
+
+                const goBack = () => {
+                    window.location.href = '/dash.html';
+                };
+
+                onMounted(() => {
+                    ensureAuth();
+                });
+
+                return { formRef, form, rules, loading, submit, goBack };
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>

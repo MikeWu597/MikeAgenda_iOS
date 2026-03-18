@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>农场最新图片</title>
+    <link href="/vendor/element-plus/index.css" rel="stylesheet">
+    <link href="/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #f5f7fa;
+        }
+        #app {
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .page-container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .page-header {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+        }
+        .back-button {
+            margin-right: 16px;
+        }
+        .page-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #303133;
+        }
+        .image-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        .image-container {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+        }
+        .image-container img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .info-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            color: #606266;
+            font-size: 14px;
+        }
+        .info-label {
+            color: #909399;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="page-container">
+            <div class="page-header">
+                <div class="header-left">
+                    <el-button class="back-button" circle @click="goBack">
+                        <i class="bi bi-arrow-left"></i>
+                    </el-button>
+                    <h1 class="page-title">农场监控</h1>
+                </div>
+                <el-button type="primary" @click="refreshImage">
+                    <i class="bi bi-arrow-clockwise"></i> 刷新
+                </el-button>
+            </div>
+
+            <div class="image-card">
+                <div class="info-row">
+                    <span>
+                        <span class="info-label">电压：</span>
+                        <el-tag v-if="voltage" type="success">{{ voltage }}</el-tag>
+                        <el-tag v-if="!voltage" type="info">--</el-tag>
+                    </span>
+                    <span>
+                        <span class="info-label">采集时间：</span>
+                        {{ captureTime || '--' }}
+                    </span>
+                </div>
+
+                <div class="image-container" @click="refreshImage">
+                    <el-image
+                        :src="imageUrl"
+                        fit="contain"
+                        :preview-src-list="[imageUrl]"
+                        style="width: 100%;"
+                    >
+                        <template #error>
+                            <div style="display: flex; align-items: center; justify-content: center; height: 400px; background: #f5f7fa;">
+                                <div style="text-align: center; color: #909399;">
+                                    <i class="bi bi-image" style="font-size: 48px; display: block; margin-bottom: 12px;"></i>
+                                    <div>暂无图片或加载失败</div>
+                                </div>
+                            </div>
+                        </template>
+                    </el-image>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <div style="margin-bottom: 8px; color: #606266; font-size: 14px;">
+                        <span class="info-label">时间轴：</span> 
+                        {{ currentImageTime || '最新' }}
+                    </div>
+                    <el-slider
+                        v-model="sliderValue"
+                        :max="Math.max(0, imagesList.length - 1)"
+                        :min="0"
+                        :disabled="imagesList.length === 0"
+                        :show-tooltip="false"
+                        @change="onSliderChange"
+                    />
+                    <div style="margin-top: 8px; display: flex; justify-content: space-between; color: #909399; font-size: 13px;">
+                        <span>共 {{ imagesList.length }} 张图片</span>
+                        <span>总占用：{{ totalSize }}</span>
+                    </div>
+                </div>
+
+                <div v-if="lastUpdate" style="margin-top: 12px; color: #909399; font-size: 13px;">
+                    最后更新：{{ lastUpdate }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/vendor/vue/vue.global.prod.js"></script>
+    <script src="/vendor/element-plus/index.full.js"></script>
+    <script>
+        const { createApp, ref, onMounted, onUnmounted } = Vue;
+        const { ElMessage } = ElementPlus;
+
+        createApp({
+            setup() {
+                const imageUrl = ref('');
+                const voltage = ref('');
+                const captureTime = ref('');
+                const lastUpdate = ref('');
+                const sliderValue = ref(0);
+                const imagesList = ref([]);
+                const totalSize = ref('0 B');
+                const currentImageTime = ref('');
+                
+                let autoRefreshTimer = null;
+                let voltageTimer = null;
+                const imageCache = new Map();
+
+                // 格式化文件大小
+                const humanSize = (bytes) => {
+                    if (!bytes || bytes <= 0) return '0 B';
+                    const units = ['B', 'KB', 'MB', 'GB'];
+                    let i = 0;
+                    let v = bytes;
+                    while (v >= 1024 && i < units.length - 1) {
+                        v /= 1024;
+                        i++;
+                    }
+                    return `${v.toFixed(2)} ${units[i]}`;
+                };
+
+                // 刷新图片
+                const refreshImage = async () => {
+                    const t = Date.now();
+                    imageUrl.value = `/farm/latest.png?t=${t}`;
+                    lastUpdate.value = new Date().toLocaleTimeString();
+                    await refreshCaptureTime(t);
+                    ElMessage.success('已刷新');
+                };
+
+                // 刷新采集时间
+                const refreshCaptureTime = async (t) => {
+                    try {
+                        const q = t ? `?t=${t}` : '';
+                        const res = await fetch(`/farm/latest.png${q}`, { 
+                            method: 'HEAD', 
+                            cache: 'no-store' 
+                        });
+                        
+                        if (!res.ok) {
+                            captureTime.value = '--';
+                            return;
+                        }
+
+                        const lm = res.headers.get('last-modified');
+                        if (!lm) {
+                            captureTime.value = '--';
+                            return;
+                        }
+
+                        const d = new Date(lm);
+                        if (!isNaN(d.getTime())) {
+                            captureTime.value = d.toLocaleString('zh-CN');
+                        } else {
+                            captureTime.value = '--';
+                        }
+                    } catch (e) {
+                        captureTime.value = '--';
+                    }
+                };
+
+                // 刷新电压
+                const refreshVoltage = async () => {
+                    try {
+                        const t = Date.now();
+                        const res = await fetch(`/farm/latest.txt?t=${t}`, { cache: 'no-store' });
+                        
+                        if (!res.ok) {
+                            voltage.value = '';
+                            return;
+                        }
+
+                        const txt = (await res.text()).trim();
+                        const mv = Number.parseInt(txt, 10);
+                        
+                        if (!Number.isFinite(mv) || mv <= 0) {
+                            voltage.value = '';
+                            return;
+                        }
+
+                        const v = (mv / 1000);
+                        voltage.value = `${v.toFixed(2)} V (${mv} mV)`;
+                    } catch (e) {
+                        voltage.value = '';
+                    }
+                };
+
+                // 加载图片列表
+                const fetchImages = async () => {
+                    try {
+                        const res = await fetch('/farm/images', { cache: 'no-store' });
+                        if (!res.ok) return;
+                        
+                        const data = await res.json();
+                        if (!data || !data.images) return;
+                        
+                        imagesList.value = data.images;
+                        sliderValue.value = Math.max(0, imagesList.value.length - 1);
+                        totalSize.value = humanSize(data.total || 0);
+                        
+                        // 更新当前图片时间
+                        if (imagesList.value.length > 0) {
+                            const currentImage = imagesList.value[sliderValue.value];
+                            currentImageTime.value = new Date(currentImage.mtime).toLocaleString();
+                        }
+                    } catch (e) {
+                        console.error('Error fetching images:', e);
+                    }
+                };
+
+                // 滑块改变
+                const onSliderChange = async (value) => {
+                    if (imagesList.value.length === 0) return;
+                    
+                    const item = imagesList.value[value];
+                    if (!item) return;
+                    
+                    currentImageTime.value = new Date(item.mtime).toLocaleString();
+                    
+                    // 如果已缓存，直接使用
+                    if (imageCache.has(item.name)) {
+                        imageUrl.value = imageCache.get(item.name);
+                        return;
+                    }
+                    
+                    try {
+                        const res = await fetch(`/farm/images/${encodeURIComponent(item.name)}`, { 
+                            cache: 'no-store' 
+                        });
+                        if (!res.ok) throw new Error('fetch image failed');
+                        
+                        const blob = await res.blob();
+                        const url = URL.createObjectURL(blob);
+                        imageCache.set(item.name, url);
+                        imageUrl.value = url;
+                    } catch (e) {
+                        imageUrl.value = `/farm/latest.png?t=${Date.now()}`;
+                    }
+                };
+
+                // 返回
+                const goBack = () => {
+                    window.location.href = '/dash.html';
+                };
+
+                // 初始化
+                onMounted(async () => {
+                    const t = Date.now();
+                    imageUrl.value = `/farm/latest.png?t=${t}`;
+                    
+                    await refreshCaptureTime(t);
+                    await refreshVoltage();
+                    await fetchImages();
+                    
+                    // 设置定时刷新
+                    voltageTimer = setInterval(refreshVoltage, 5000);
+                    autoRefreshTimer = setInterval(fetchImages, 5000);
+                });
+
+                // 清理
+                onUnmounted(() => {
+                    if (voltageTimer) clearInterval(voltageTimer);
+                    if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+                    
+                    // 清理对象URL
+                    for (const url of imageCache.values()) {
+                        try {
+                            URL.revokeObjectURL(url);
+                        } catch (e) {}
+                    }
+                });
+
+                return {
+                    imageUrl,
+                    voltage,
+                    captureTime,
+                    lastUpdate,
+                    sliderValue,
+                    imagesList,
+                    totalSize,
+                    currentImageTime,
+                    refreshImage,
+                    onSliderChange,
+                    goBack
+                };
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>

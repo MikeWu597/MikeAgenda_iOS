@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>已完成事项</title>
+    <link href="/vendor/element-plus/index.css" rel="stylesheet">
+    <link href="/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            background: #f5f7fa;
+        }
+
+        #app {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 18px;
+        }
+
+        .page-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 20px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .muted {
+            color: #909399;
+        }
+
+        .item-meta {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 8px;
+            font-size: 12px;
+            color: #606266;
+        }
+
+        .process-row {
+            display: flex;
+            gap: 10px;
+            padding: 10px;
+            border: 1px solid #ebeef5;
+            background: #fff;
+            border-radius: 10px;
+            align-items: flex-start;
+        }
+
+        .process-row + .process-row {
+            margin-top: 10px;
+        }
+
+        .drag-handle {
+            cursor: grab;
+            padding: 6px 8px;
+            color: #909399;
+            user-select: none;
+        }
+
+        .dragging {
+            opacity: 0.55;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <el-card shadow="never">
+            <template #header>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap: 12px;">
+                    <div class="page-title">
+                        <el-button circle @click="goBack" title="返回">
+                            <i class="bi bi-arrow-left"></i>
+                        </el-button>
+                        <span>已完成事项</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap: 8px;">
+                        <el-button :loading="loading" @click="reload" title="刷新">
+                            <i class="bi bi-arrow-clockwise"></i>
+                            <span style="margin-left:6px;">刷新</span>
+                        </el-button>
+                    </div>
+                </div>
+            </template>
+
+            <div v-loading="loading">
+                <el-empty v-if="!loading && !items.length" description="暂无已完成事项"></el-empty>
+
+                <div v-if="items.length" style="display:flex; align-items:center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;">
+                    <div class="muted" style="font-size: 13px;">
+                        共 {{ items.length }} 条
+                    </div>
+                    <div style="display:flex; align-items:center; gap: 10px; flex-wrap: wrap;">
+                        <div class="muted" style="display:flex; align-items:center; gap: 6px; font-size: 13px;">
+                            <span>每页</span>
+                            <el-select v-model="pageSize" size="small" style="width: 100px;">
+                                <el-option v-for="n in [10, 20, 50, 100]" :key="n" :label="n + ' 条'" :value="n"></el-option>
+                            </el-select>
+                        </div>
+                        <el-pagination
+                            background
+                            layout="prev, pager, next"
+                            :total="items.length"
+                            v-model:current-page="currentPage"
+                            v-model:page-size="pageSize"
+                        ></el-pagination>
+                        <div class="muted" style="display:flex; align-items:center; gap: 6px; font-size: 13px;">
+                            <span>跳至</span>
+                            <el-input-number v-model="currentPage" :min="1" :max="Math.max(1, Math.ceil(items.length / pageSize))" size="small" style="width: 120px;"></el-input-number>
+                            <span>页</span>
+                        </div>
+                    </div>
+                </div>
+
+                <el-collapse v-if="items.length" v-model="openIds">
+                    <el-collapse-item v-for="it in pagedItems" :key="String(it.id)" :name="String(it.id)">
+                        <template #title>
+                            <div style="display:flex; align-items:center; justify-content:space-between; width: 100%; gap: 12px;">
+                                <div style="display:flex; align-items:center; gap: 8px; min-width: 0;">
+                                    <span v-for="c in getItemCategories(it)" :key="c.id">
+                                        <el-tag
+                                            size="small"
+                                            effect="dark"
+                                            :style="{ backgroundColor: c.color || '#409EFF', borderColor: c.color || '#409EFF' }"
+                                        >
+                                            {{ c.name }}
+                                        </el-tag>
+                                    </span>
+                                    <span style="font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                        {{ it.title }}
+                                    </span>
+                                </div>
+                                <div class="muted" style="font-size: 12px; white-space: nowrap;">
+                                    <i class="bi bi-hash"></i> {{ it.id }}
+                                </div>
+                            </div>
+                        </template>
+
+                        <div class="item-meta">
+                            <span v-if="it.deadline">
+                                <i class="bi bi-calendar-date"></i>
+                                <span style="margin-left: 6px;">{{ it.deadline }}</span>
+                            </span>
+                            <span v-if="it.planned_time">
+                                <i class="bi bi-clock"></i>
+                                <span style="margin-left: 6px;">{{ formatPlannedTime(it.planned_time) }}</span>
+                            </span>
+                        </div>
+
+                        <div style="margin-top: 12px; display:flex; flex-wrap: wrap; gap: 8px;">
+                            <el-button type="primary" @click="restoreItem(it)">恢复</el-button>
+                            <el-button type="danger" @click="deleteItem(it)">删除</el-button>
+                            <el-button @click="openEditDialog(it)">编辑事项</el-button>
+                        </div>
+                    </el-collapse-item>
+                </el-collapse>
+            </div>
+        </el-card>
+
+        <!-- Edit Item Dialog -->
+        <el-dialog v-model="editDialog.visible" title="编辑事项" width="640px">
+            <el-form label-width="92px">
+                <el-form-item label="标题" required>
+                    <el-input v-model.trim="editDialog.form.title"></el-input>
+                </el-form-item>
+                <el-form-item label="描述">
+                    <el-input v-model="editDialog.form.description" type="textarea" :rows="3"></el-input>
+                </el-form-item>
+                <el-form-item label="截止日期" required>
+                    <el-date-picker v-model="editDialog.form.deadline" type="date" value-format="YYYY-MM-DD"></el-date-picker>
+                </el-form-item>
+                <el-form-item label="计划时间">
+                    <el-date-picker v-model="editDialog.form.planned_time" type="datetime" value-format="YYYY-MM-DDTHH:mm"></el-date-picker>
+                </el-form-item>
+                <el-form-item label="分类">
+                    <el-select v-model="editDialog.form.category" multiple collapse-tags placeholder="选择分类" style="width: 100%;">
+                        <el-option
+                            v-for="c in categories"
+                            :key="String(c.id)"
+                            :label="c.name"
+                            :value="String(c.id)"
+                        ></el-option>
+                    </el-select>
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <el-button @click="editDialog.visible = false">取消</el-button>
+                <el-button type="primary" :loading="editDialog.saving" @click="saveEdit">保存</el-button>
+            </template>
+        </el-dialog>
+
+        <!-- Process Dialog -->
+        <el-dialog v-model="processDialog.visible" title="编辑流程" width="860px">
+            <template #header>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap: 12px;">
+                    <div>
+                        <div style="font-weight: 700;">编辑流程</div>
+                        <div class="muted" style="font-size: 12px; margin-top: 4px;">#{{ processDialog.itemId }} {{ processDialog.itemTitle }}</div>
+                    </div>
+                    <el-button type="primary" @click="addProcess">添加流程</el-button>
+                </div>
+            </template>
+
+            <div v-if="!processes.length">
+                <el-empty description="暂无流程"></el-empty>
+            </div>
+            <div v-if="processes.length">
+                <div
+                    v-for="p in processes"
+                    :key="p._key"
+                    class="process-row"
+                    :class="{ dragging: drag.id === p._key }"
+                    draggable="true"
+                    @dragstart="onProcessDragStart($event, p._key)"
+                    @dragend="onProcessDragEnd"
+                    @dragover.prevent="onProcessDragOver(p._key)"
+                >
+                    <div class="drag-handle" title="拖拽排序">
+                        <i class="bi bi-grip-vertical"></i>
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <el-input v-model.trim="p.name" placeholder="流程名称"></el-input>
+                        <div style="margin-top: 10px;">
+                            <el-input v-model="p.note" type="textarea" :rows="3" placeholder="备注"></el-input>
+                        </div>
+                    </div>
+                    <div style="width: 180px; display:flex; flex-direction: column; gap: 10px;">
+                        <el-select v-model.number="p.status" placeholder="状态">
+                            <el-option label="未开始" :value="0"></el-option>
+                            <el-option label="进行中" :value="1"></el-option>
+                            <el-option label="已完成" :value="2"></el-option>
+                        </el-select>
+                        <el-button type="danger" @click="removeProcess(p._key)">
+                            <i class="bi bi-trash"></i>
+                            <span style="margin-left: 6px;">删除</span>
+                        </el-button>
+                    </div>
+                </div>
+            </div>
+
+            <template #footer>
+                <el-button @click="processDialog.visible = false">取消</el-button>
+                <el-button type="primary" :loading="processDialog.saving" @click="saveProcess">保存</el-button>
+            </template>
+        </el-dialog>
+    </div>
+
+    <script src="/vendor/vue/vue.global.prod.js"></script>
+    <script src="/vendor/element-plus/index.full.js"></script>
+    <script>
+        const { createApp } = Vue;
+
+        const getSessionFromCookie = () => {
+            const cookies = document.cookie.split('; ');
+            for (const cookie of cookies) {
+                const [name, value] = cookie.split('=');
+                if (name === 'session') {
+                    return decodeURIComponent(value);
+                }
+            }
+            return null;
+        };
+
+        function safeJsonParse(value, fallback) {
+            try {
+                if (!value) return fallback;
+                if (typeof value !== 'string') return fallback;
+                return JSON.parse(value);
+            } catch {
+                return fallback;
+            }
+        }
+
+        function uid() {
+            return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+        }
+
+        createApp({
+            data() {
+                return {
+                    loading: false,
+                    items: [],
+                    openIds: [],
+                    categories: [],
+
+                    currentPage: 1,
+                    pageSize: 20,
+
+                    editDialog: {
+                        visible: false,
+                        saving: false,
+                        form: {
+                            id: '',
+                            title: '',
+                            description: '',
+                            deadline: '',
+                            planned_time: '',
+                            category: []
+                        }
+                    },
+
+                    processDialog: {
+                        visible: false,
+                        saving: false,
+                        itemId: '',
+                        itemTitle: ''
+                    },
+
+                    processes: [],
+                    drag: {
+                        id: null,
+                        lastOverId: null
+                    }
+                };
+            },
+            computed: {
+                pagedItems() {
+                    const start = (Number(this.currentPage || 1) - 1) * Number(this.pageSize || 20);
+                    const end = start + Number(this.pageSize || 20);
+                    return (this.items || []).slice(start, end);
+                }
+            },
+            watch: {
+                items() {
+                    this.currentPage = 1;
+                    this.openIds = [];
+                },
+                pageSize() {
+                    this.currentPage = 1;
+                    this.openIds = [];
+                },
+                currentPage() {
+                    this.openIds = [];
+                }
+            },
+            methods: {
+                goBack() {
+                    window.location.href = 'item.html';
+                },
+                requireSessionOrRedirect() {
+                    const session = getSessionFromCookie();
+                    if (!session) {
+                        ElementPlus.ElMessage.error('未授权，请重新登录');
+                        window.location.href = '/login.html';
+                        return null;
+                    }
+                    return session;
+                },
+                formatPlannedTime(value) {
+                    if (!value) return '';
+                    return String(value).replace('T', ' ');
+                },
+                getItemCategoryIds(item) {
+                    const raw = item && item.category;
+                    const parsed = Array.isArray(raw) ? raw : safeJsonParse(raw, []);
+                    return (parsed || []).map(x => String(x));
+                },
+                getItemCategories(item) {
+                    const ids = this.getItemCategoryIds(item);
+                    if (!ids.length) return [];
+                    return ids.map(id => {
+                        const c = this.categories.find(x => String(x.id) === String(id));
+                        return c ? { id: String(c.id), name: c.name, color: c.color } : { id: String(id), name: '未知分类', color: '#909399' };
+                    });
+                },
+
+                async reload() {
+                    await this.fetchAll();
+                },
+                async fetchAll() {
+                    await this.fetchCategories();
+                    await this.fetchItems();
+                },
+                async fetchCategories() {
+                    const session = this.requireSessionOrRedirect();
+                    if (!session) return;
+
+                    try {
+                        const resp = await fetch('/api/getCategories', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ session })
+                        });
+                        if (resp.status === 401) {
+                            ElementPlus.ElMessage.error('未授权，请重新登录');
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await resp.json();
+                        if (data.success) {
+                            this.categories = data.categories || [];
+                        } else {
+                            ElementPlus.ElMessage.error(data.message || '加载分类失败');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        ElementPlus.ElMessage.error('加载分类失败，请重试');
+                    }
+                },
+                async fetchItems() {
+                    const session = this.requireSessionOrRedirect();
+                    if (!session) return;
+
+                    this.loading = true;
+                    try {
+                        const resp = await fetch('/api/getDoneItems', {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'session': session
+                            }
+                        });
+                        if (resp.status === 401) {
+                            ElementPlus.ElMessage.error('未授权，请重新登录');
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await resp.json();
+                        if (data.success) {
+                            this.items = data.items || [];
+                        } else {
+                            ElementPlus.ElMessage.error(data.message || '加载事项失败');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        ElementPlus.ElMessage.error('加载事项失败，请重试');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async restoreItem(item) {
+                    const session = this.requireSessionOrRedirect();
+                    if (!session) return;
+
+                    try {
+                        const resp = await fetch('/api/markItemAsUndone', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: item.id, session })
+                        });
+                        if (resp.status === 401) {
+                            ElementPlus.ElMessage.error('未授权，请重新登录');
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await resp.json();
+                        if (data.success) {
+                            ElementPlus.ElMessage.success('事项已恢复');
+                            await this.fetchItems();
+                        } else {
+                            ElementPlus.ElMessage.error(data.message || '恢复失败');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        ElementPlus.ElMessage.error('恢复失败，请重试');
+                    }
+                },
+                async deleteItem(item) {
+                    const session = this.requireSessionOrRedirect();
+                    if (!session) return;
+
+                    try {
+                        await ElementPlus.ElMessageBox.confirm(
+                            '确定要删除该事项吗？此操作不可撤销！',
+                            '确认删除',
+                            { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
+                        );
+                    } catch {
+                        return;
+                    }
+
+                    try {
+                        const resp = await fetch('/api/deleteItem', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: item.id, session })
+                        });
+                        if (resp.status === 401) {
+                            ElementPlus.ElMessage.error('未授权，请重新登录');
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await resp.json();
+                        if (data.success) {
+                            ElementPlus.ElMessage.success('事项已删除');
+                            await this.fetchItems();
+                        } else {
+                            ElementPlus.ElMessage.error(data.message || '删除失败');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        ElementPlus.ElMessage.error('删除失败，请重试');
+                    }
+                },
+
+                openEditDialog(item) {
+                    const categoryIds = this.getItemCategoryIds(item);
+                    this.editDialog.form = {
+                        id: String(item.id),
+                        title: item.title || '',
+                        description: item.description || '',
+                        deadline: item.deadline || '',
+                        planned_time: item.planned_time || '',
+                        category: categoryIds
+                    };
+                    this.editDialog.visible = true;
+                },
+                async saveEdit() {
+                    const session = this.requireSessionOrRedirect();
+                    if (!session) return;
+
+                    if (!this.editDialog.form.title || !this.editDialog.form.deadline) {
+                        ElementPlus.ElMessage.warning('标题与截止日期为必填');
+                        return;
+                    }
+
+                    this.editDialog.saving = true;
+                    try {
+                        const resp = await fetch('/api/updateItem', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                id: this.editDialog.form.id,
+                                title: this.editDialog.form.title,
+                                description: this.editDialog.form.description,
+                                deadline: this.editDialog.form.deadline,
+                                planned_time: this.editDialog.form.planned_time,
+                                category: this.editDialog.form.category,
+                                session
+                            })
+                        });
+                        if (resp.status === 401) {
+                            ElementPlus.ElMessage.error('未授权，请重新登录');
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await resp.json();
+                        if (data.success) {
+                            ElementPlus.ElMessage.success('事项更新成功');
+                            this.editDialog.visible = false;
+                            await this.fetchItems();
+                        } else {
+                            ElementPlus.ElMessage.error(data.message || '更新失败');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        ElementPlus.ElMessage.error('更新失败，请重试');
+                    } finally {
+                        this.editDialog.saving = false;
+                    }
+                },
+
+                openProcessDialog(item) {
+                    this.processDialog.itemId = String(item.id);
+                    this.processDialog.itemTitle = item.title || '';
+
+                    const raw = item.metadata;
+                    const list = Array.isArray(raw) ? raw : safeJsonParse(raw, []);
+                    this.processes = (list || []).map(p => ({
+                        _key: uid(),
+                        name: p && p.name ? String(p.name) : '',
+                        note: p && p.note ? String(p.note) : '',
+                        status: typeof (p && p.status) === 'number' ? p.status : parseInt((p && p.status) || 0, 10) || 0
+                    }));
+                    this.processDialog.visible = true;
+                },
+                addProcess() {
+                    this.processes.push({ _key: uid(), name: '', note: '', status: 0 });
+                },
+                removeProcess(key) {
+                    this.processes = this.processes.filter(p => p._key !== key);
+                },
+
+                onProcessDragStart(event, key) {
+                    this.drag.id = key;
+                    this.drag.lastOverId = null;
+                    try {
+                        event.dataTransfer.effectAllowed = 'move';
+                        event.dataTransfer.setData('text/plain', key);
+                    } catch {}
+                },
+                onProcessDragOver(overKey) {
+                    if (!this.drag.id) return;
+                    if (this.drag.id === overKey) return;
+                    if (this.drag.lastOverId === overKey) return;
+
+                    const fromIndex = this.processes.findIndex(p => p._key === this.drag.id);
+                    const toIndex = this.processes.findIndex(p => p._key === overKey);
+                    if (fromIndex < 0 || toIndex < 0) return;
+
+                    const [moved] = this.processes.splice(fromIndex, 1);
+                    this.processes.splice(toIndex, 0, moved);
+                    this.drag.lastOverId = overKey;
+                },
+                onProcessDragEnd() {
+                    this.drag.id = null;
+                    this.drag.lastOverId = null;
+                },
+
+                async saveProcess() {
+                    const session = this.requireSessionOrRedirect();
+                    if (!session) return;
+
+                    if (!this.processDialog.itemId) {
+                        ElementPlus.ElMessage.error('未找到关联的事项ID');
+                        return;
+                    }
+
+                    const payload = this.processes.map(p => ({
+                        name: p.name,
+                        note: p.note,
+                        status: Number(p.status)
+                    }));
+
+                    this.processDialog.saving = true;
+                    try {
+                        const resp = await fetch('/api/updateItemMetadata', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                id: this.processDialog.itemId,
+                                metadata: JSON.stringify(payload),
+                                session
+                            })
+                        });
+                        if (resp.status === 401) {
+                            ElementPlus.ElMessage.error('未授权，请重新登录');
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await resp.json();
+                        if (data.success) {
+                            ElementPlus.ElMessage.success('流程已保存');
+                            this.processDialog.visible = false;
+                            await this.fetchItems();
+                        } else {
+                            ElementPlus.ElMessage.error(data.message || '保存失败');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        ElementPlus.ElMessage.error('保存失败，请重试');
+                    } finally {
+                        this.processDialog.saving = false;
+                    }
+                }
+            },
+            mounted() {
+                this.fetchAll();
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>

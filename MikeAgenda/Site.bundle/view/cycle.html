@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>所有循环</title>
+    <link href="/vendor/element-plus/index.css" rel="stylesheet">
+    <link href="/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 0; background: #f5f7fa; }
+        #app { min-height: 100vh; padding: 20px; }
+        .page-container { max-width: 1080px; margin: 0 auto; }
+        .page-header {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px 18px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .page-title { font-size: 20px; font-weight: 700; color: #303133; }
+        .muted { color: #909399; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="page-container">
+            <div class="page-header">
+                <el-button circle @click="goBack" aria-label="返回">
+                    <i class="bi bi-arrow-left"></i>
+                </el-button>
+                <div class="page-title">所有循环</div>
+                <div style="margin-left:auto; display:flex; gap: 8px;">
+                    <el-button type="primary" @click="goCreate">
+                        <i class="bi bi-plus-lg"></i>
+                        新建循环
+                    </el-button>
+                    <el-button plain @click="load" :loading="loading">
+                        <i class="bi bi-arrow-repeat"></i>
+                        刷新
+                    </el-button>
+                </div>
+            </div>
+
+            <el-card shadow="hover" style="border-radius: 12px;">
+                <el-table v-loading="loading" :data="cycles" style="width: 100%" empty-text="暂无循环">
+                    <el-table-column prop="name" label="名称" min-width="170"></el-table-column>
+                    <el-table-column label="循环方式" min-width="200">
+                        <template #default="{ row }">
+                            <span class="muted">{{ row._formattedCycle }}</span>
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="下次执行" width="120">
+                        <template #default="{ row }">
+                            {{ row._nextMMDD }}
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="备注" min-width="220">
+                        <template #default="{ row }">
+                            <span class="muted">{{ row.note || '无备注' }}</span>
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="操作" width="140" fixed="right">
+                        <template #default="{ row }">
+                            <el-dropdown trigger="click" @command="handleActionCommand">
+                                <el-button size="small" @click.stop>
+                                    操作
+                                    <i class="bi bi-chevron-down" style="margin-left: 6px;"></i>
+                                </el-button>
+                                <template #dropdown>
+                                    <el-dropdown-menu>
+                                        <el-dropdown-item :command="{ action: 'edit', row }">编辑</el-dropdown-item>
+                                        <el-dropdown-item :command="{ action: 'remove', row }" divided>删除</el-dropdown-item>
+                                        <el-dropdown-item :command="{ action: 'complete', row }">完成本次</el-dropdown-item>
+                                        <el-dropdown-item :command="{ action: 'delay', row }">推迟一天</el-dropdown-item>
+                                    </el-dropdown-menu>
+                                </template>
+                            </el-dropdown>
+                        </template>
+                    </el-table-column>
+                </el-table>
+            </el-card>
+
+            <el-dialog v-model="editVisible" title="编辑循环" width="520px">
+                <el-form ref="formRef" :model="edit" :rules="rules" label-width="100px">
+                    <el-form-item label="名称" prop="name">
+                        <el-input v-model="edit.name" clearable />
+                    </el-form-item>
+                    <el-form-item label="备注">
+                        <el-input v-model="edit.note" type="textarea" :rows="3" />
+                    </el-form-item>
+                    <el-form-item label="循环方式" prop="cycle">
+                        <el-select v-model="edit.cycle" style="width: 100%;" placeholder="请选择">
+                            <el-option label="每周某天" value="weekly"></el-option>
+                            <el-option label="每月第某天" value="monthly"></el-option>
+                            <el-option label="每月倒数某天" value="monthly_last"></el-option>
+                            <el-option label="每天" value="daily"></el-option>
+                        </el-select>
+                    </el-form-item>
+
+                    <template v-if="edit.cycle === 'weekly'">
+                        <el-form-item label="星期几" prop="weeklyDay">
+                            <el-select v-model="edit.weeklyDay" style="width: 100%;">
+                                <el-option label="星期日" value="0"></el-option>
+                                <el-option label="星期一" value="1"></el-option>
+                                <el-option label="星期二" value="2"></el-option>
+                                <el-option label="星期三" value="3"></el-option>
+                                <el-option label="星期四" value="4"></el-option>
+                                <el-option label="星期五" value="5"></el-option>
+                                <el-option label="星期六" value="6"></el-option>
+                            </el-select>
+                        </el-form-item>
+                    </template>
+                    <template v-if="edit.cycle === 'monthly'">
+                        <el-form-item label="每月第几天" prop="monthlyDay">
+                            <el-input-number v-model="edit.monthlyDay" :min="1" :max="31" />
+                        </el-form-item>
+                    </template>
+                    <template v-if="edit.cycle === 'monthly_last'">
+                        <el-form-item label="每月倒数第" prop="monthlyLastDay">
+                            <div style="display:flex; align-items:center; gap: 10px;">
+                                <el-input-number v-model="edit.monthlyLastDay" :min="1" :max="31" />
+                                <span class="muted">天</span>
+                            </div>
+                        </el-form-item>
+                    </template>
+
+                    <el-form-item label="今天执行">
+                        <el-switch v-model="edit.executeToday" active-text="是" inactive-text="否" />
+                    </el-form-item>
+                    <el-form-item label="下次执行">
+                        <el-tag type="info">{{ nextPreview }}</el-tag>
+                    </el-form-item>
+                </el-form>
+
+                <template #footer>
+                    <el-button @click="editVisible=false">取消</el-button>
+                    <el-button type="primary" :loading="saving" @click="save">保存</el-button>
+                </template>
+            </el-dialog>
+        </div>
+    </div>
+
+    <script src="/vendor/vue/vue.global.prod.js"></script>
+    <script src="/vendor/element-plus/index.full.js"></script>
+    <script>
+        const { createApp, ref, reactive, computed, watch, onMounted } = Vue;
+        const { ElMessage, ElMessageBox } = ElementPlus;
+
+        createApp({
+            setup() {
+                const loading = ref(true);
+                const saving = ref(false);
+                const cycles = ref([]);
+
+                const editVisible = ref(false);
+                const formRef = ref(null);
+                const edit = reactive({
+                    id: null,
+                    name: '',
+                    note: '',
+                    cycle: '',
+                    weeklyDay: '1',
+                    monthlyDay: 1,
+                    monthlyLastDay: 1,
+                    executeToday: false
+                });
+
+                const rules = {
+                    name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
+                    cycle: [{ required: true, message: '请选择循环方式', trigger: 'change' }]
+                };
+
+                const getSession = () => {
+                    const cookies = document.cookie.split(';');
+                    for (const cookie of cookies) {
+                        const [name, value] = cookie.trim().split('=');
+                        if (name === 'session') return decodeURIComponent(value);
+                    }
+                    return null;
+                };
+
+                const ensureAuth = () => {
+                    const session = getSession();
+                    if (!session) {
+                        window.location.href = '/login.html';
+                        return null;
+                    }
+                    return session;
+                };
+
+                const parseCycle = (cycleRow) => {
+                    try {
+                        const parsed = JSON.parse(cycleRow.cycle || '{}');
+                        const cycleType = parsed.cycle || '';
+                        const configObj = parsed.config ? JSON.parse(parsed.config) : {};
+                        return { cycleType, configObj };
+                    } catch {
+                        return { cycleType: '', configObj: {} };
+                    }
+                };
+
+                const formatCycleConfig = (cycleType, configObj) => {
+                    if (cycleType === 'weekly') {
+                        const daysOfWeek = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+                        const raw = String(configObj.day ?? '');
+                        const first = raw.split(',')[0];
+                        const idx = Number(first);
+                        return `每周 ${daysOfWeek[idx] || first}`;
+                    }
+                    if (cycleType === 'monthly') return `每月第 ${configObj.day} 天`;
+                    if (cycleType === 'monthly_last') return `每月倒数第 ${configObj.day} 天`;
+                    if (cycleType === 'daily') return '每天';
+                    return '';
+                };
+
+                const toMMDD = (iso) => {
+                    const d = new Date(iso);
+                    if (Number.isNaN(d.getTime())) return '--';
+                    const mm = String(d.getMonth() + 1).padStart(2, '0');
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    return `${mm}-${dd}`;
+                };
+
+                const toLocalYmd = (d) => {
+                    const yyyy = d.getFullYear();
+                    const mm = String(d.getMonth() + 1).padStart(2, '0');
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    return `${yyyy}-${mm}-${dd}`;
+                };
+
+                const toLocalStartOfDayIso = (d) => `${toLocalYmd(d)}T00:00:00`;
+
+                const enrichCycles = (rows) => {
+                    return rows.map((r) => {
+                        const { cycleType, configObj } = parseCycle(r);
+                        return {
+                            ...r,
+                            _cycleType: cycleType,
+                            _configObj: configObj,
+                            _formattedCycle: formatCycleConfig(cycleType, configObj),
+                            _nextMMDD: toMMDD(r.next)
+                        };
+                    });
+                };
+
+                const load = async () => {
+                    const session = ensureAuth();
+                    if (!session) return;
+                    loading.value = true;
+                    try {
+                        const res = await fetch('/api/getCycles', {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'session': session
+                            }
+                        });
+                        if (res.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await res.json();
+                        if (!data.success) throw new Error(data.message || '加载循环失败');
+                        cycles.value = enrichCycles(Array.isArray(data.cycles) ? data.cycles : []);
+                    } catch (e) {
+                        console.error(e);
+                        ElMessage.error(e?.message || '加载循环失败');
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                // 新增：判断日期是否符合循环配置
+                const isCycleMatch = (cycleType, configJsonString, yyyymmdd) => {
+                    const year = parseInt(yyyymmdd.slice(0, 4), 10);
+                    const month = parseInt(yyyymmdd.slice(4, 6), 10);
+                    const day = parseInt(yyyymmdd.slice(6, 8), 10);
+
+                    switch (cycleType) {
+                        case 'daily':
+                            return true;
+                        case 'weekly': {
+                            const weekday = new Date(year, month - 1, day).getDay();
+                            const parsedConfig = JSON.parse(configJsonString);
+                            const daysOfWeek = String(parsedConfig.day || '')
+                                .split(',')
+                                .filter(Boolean)
+                                .map(Number);
+                            return daysOfWeek.includes(weekday);
+                        }
+                        case 'monthly':
+                            return day === Number(JSON.parse(configJsonString).day);
+                        case 'monthly_last': {
+                            const lastDayOfMonth = new Date(year, month, 0).getDate();
+                            return day === Number(lastDayOfMonth - JSON.parse(configJsonString).day + 1);
+                        }
+                        default:
+                            return false;
+                    }
+                };
+
+                const calculateDoneDate = (cycleType, configObj, currentNextDateRaw) => {
+                    const base = new Date(currentNextDateRaw);
+                    base.setHours(0, 0, 0, 0);
+                    let nextDate = new Date(base);
+                    nextDate.setDate(base.getDate() + 1);
+                    let dayCount = 0;
+                    while (
+                        !isCycleMatch(
+                            cycleType,
+                            JSON.stringify(configObj),
+                            toLocalYmd(nextDate).replace(/-/g, '')
+                        ) &&
+                        dayCount <= 365
+                    ) {
+                        nextDate.setDate(nextDate.getDate() + 1);
+                        dayCount++;
+                    }
+                    return nextDate ? toLocalStartOfDayIso(nextDate) : null;
+                };
+
+                const calculateNextDate = (cycleType, configObj) => {
+                    const today = new Date();
+                    const today0 = new Date(today);
+                    today0.setHours(0, 0, 0, 0);
+                    let nextDate = null;
+
+                    if (cycleType === 'weekly') {
+                        const targetDay = parseInt(configObj.day, 10);
+                        let daysToAdd = (targetDay - today0.getDay() + 7) % 7;
+                        if (daysToAdd === 0) daysToAdd = 7;
+                        nextDate = new Date(today0);
+                        nextDate.setDate(today0.getDate() + daysToAdd);
+                    } else if (cycleType === 'monthly') {
+                        const targetDay = parseInt(configObj.day, 10);
+                        nextDate = new Date(today0.getFullYear(), today0.getMonth(), targetDay);
+                        nextDate.setHours(0, 0, 0, 0);
+                        if (nextDate <= today0) nextDate.setMonth(today0.getMonth() + 1);
+                    } else if (cycleType === 'monthly_last') {
+                        const offsetFromEnd = parseInt(configObj.day, 10);
+                        const lastDay = new Date(today0.getFullYear(), today0.getMonth() + 1, 0);
+                        lastDay.setHours(0, 0, 0, 0);
+                        nextDate = new Date(lastDay);
+                        nextDate.setDate(lastDay.getDate() - (offsetFromEnd - 1));
+                        if (nextDate <= today0) {
+                            const nextMonthLastDay = new Date(today0.getFullYear(), today0.getMonth() + 2, 0);
+                            nextMonthLastDay.setHours(0, 0, 0, 0);
+                            nextDate = new Date(nextMonthLastDay);
+                            nextDate.setDate(nextMonthLastDay.getDate() - (offsetFromEnd - 1));
+                        }
+                    } else if (cycleType === 'daily') {
+                        nextDate = new Date(today0);
+                        nextDate.setDate(today0.getDate() + 1);
+                    }
+
+                    return nextDate ? toLocalStartOfDayIso(nextDate) : null;
+                };
+
+                const computeNextPreviewDate = () => {
+                    if (!edit.cycle) return '--';
+                    let configObj = {};
+                    if (edit.cycle === 'weekly') configObj = { day: String(edit.weeklyDay) };
+                    if (edit.cycle === 'monthly') configObj = { day: String(edit.monthlyDay) };
+                    if (edit.cycle === 'monthly_last') configObj = { day: String(edit.monthlyLastDay) };
+
+                    let next = calculateNextDate(edit.cycle, configObj);
+                    if (edit.executeToday) {
+                        const today0 = new Date();
+                        today0.setHours(0, 0, 0, 0);
+                        next = toLocalStartOfDayIso(today0);
+                    }
+                    return (next || '').split('T')[0] || '--';
+                };
+
+                const nextPreview = computed(computeNextPreviewDate);
+
+                watch(
+                    () => edit.cycle,
+                    (v) => {
+                        if (v === 'weekly') edit.weeklyDay = '1';
+                        if (v === 'monthly') edit.monthlyDay = 1;
+                        if (v === 'monthly_last') edit.monthlyLastDay = 1;
+                        edit.executeToday = false;
+                    }
+                );
+
+                const openEdit = (row) => {
+                    edit.id = row.id;
+                    edit.name = row.name || '';
+                    edit.note = row.note || '';
+                    edit.cycle = row._cycleType || '';
+                    edit.executeToday = false;
+
+                    const cfg = row._configObj || {};
+                    edit.weeklyDay = cfg.day != null ? String(String(cfg.day).split(',')[0]) : '1';
+                    edit.monthlyDay = cfg.day != null ? Number(cfg.day) : 1;
+                    edit.monthlyLastDay = cfg.day != null ? Number(cfg.day) : 1;
+
+                    editVisible.value = true;
+                };
+
+                const handleActionCommand = (payload) => {
+                    const action = payload?.action;
+                    const row = payload?.row;
+                    if (!row) return;
+                    if (action === 'edit') return openEdit(row);
+                    if (action === 'remove') return remove(row);
+                    if (action === 'complete') return completeCurrent(row);
+                    if (action === 'delay') return delayOneDay(row);
+                };
+
+                const save = async () => {
+                    if (!formRef.value) return;
+                    await formRef.value.validate(async (valid) => {
+                        if (!valid) return;
+                        const session = ensureAuth();
+                        if (!session) return;
+
+                        let cycleConfig = {};
+                        if (edit.cycle === 'weekly') cycleConfig = { day: String(edit.weeklyDay) };
+                        if (edit.cycle === 'monthly') cycleConfig = { day: String(edit.monthlyDay) };
+                        if (edit.cycle === 'monthly_last') cycleConfig = { day: String(edit.monthlyLastDay) };
+
+                        let next = calculateNextDate(edit.cycle, cycleConfig);
+                        if (edit.executeToday) {
+                            const today0 = new Date();
+                            today0.setHours(0, 0, 0, 0);
+                            next = toLocalStartOfDayIso(today0);
+                        }
+
+                        saving.value = true;
+                        try {
+                            const res = await fetch('/api/updateCycle', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    id: String(edit.id),
+                                    name: edit.name,
+                                    note: edit.note,
+                                    cycle: edit.cycle,
+                                    next: next,
+                                    config: JSON.stringify(cycleConfig),
+                                    session
+                                })
+                            });
+                            if (res.status === 401) {
+                                window.location.href = '/login.html';
+                                return;
+                            }
+                            const data = await res.json();
+                            if (!data.success) throw new Error(data.message || '更新失败');
+                            ElMessage.success('循环已更新');
+                            editVisible.value = false;
+                            await load();
+                        } catch (e) {
+                            console.error(e);
+                            ElMessage.error(e?.message || '更新失败');
+                        } finally {
+                            saving.value = false;
+                        }
+                    });
+                };
+
+                const remove = async (row) => {
+                    const session = ensureAuth();
+                    if (!session) return;
+                    try {
+                        await ElMessageBox.confirm('确定要删除该循环吗？此操作不可撤销！', '确认删除', {
+                            type: 'warning',
+                            confirmButtonText: '删除',
+                            cancelButtonText: '取消'
+                        });
+                    } catch {
+                        return;
+                    }
+
+                    try {
+                        const res = await fetch('/api/deleteCycle', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: String(row.id), session })
+                        });
+                        if (res.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await res.json();
+                        if (!data.success) throw new Error(data.message || '删除失败');
+                        ElMessage.success('循环已删除');
+                        await load();
+                    } catch (e) {
+                        console.error(e);
+                        ElMessage.error(e?.message || '删除失败');
+                    }
+                };
+
+                const completeCurrent = async (row) => {
+                    const session = ensureAuth();
+                    if (!session) return;
+                    const cycleConfig = parseCycle(row);
+                    const nextNextDate = calculateDoneDate(cycleConfig.cycleType, cycleConfig.configObj, row.next);
+
+                    try {
+                        const res = await fetch('/api/updateCycleNextTime', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                id: String(row.id),
+                                nexttime: nextNextDate,
+                                session
+                            })
+                        });
+                        if (res.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await res.json();
+                        if (!data.success) throw new Error(data.message || '更新失败');
+                        ElMessage.success('已完成本次循环，下次执行时间已更新');
+                        await load();
+                    } catch (e) {
+                        console.error(e);
+                        ElMessage.error(e?.message || '更新失败');
+                    }
+                };
+
+                const delayOneDay = async (row) => {
+                    const session = ensureAuth();
+                    if (!session) return;
+                    try {
+                        const res = await fetch('/api/delayCycleNextDate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: String(row.id), session })
+                        });
+                        if (res.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await res.json();
+                        if (!data.success) throw new Error(data.message || '推迟失败');
+                        ElMessage.success('循环的下次执行日期已推迟一天');
+                        await load();
+                    } catch (e) {
+                        console.error(e);
+                        ElMessage.error(e?.message || '推迟失败');
+                    }
+                };
+
+                const goBack = () => {
+                    window.location.href = '/dash.html';
+                };
+
+                const goCreate = () => {
+                    window.location.href = '/create/cycle.html';
+                };
+
+                onMounted(load);
+
+                return {
+                    loading,
+                    cycles,
+                    load,
+                    editVisible,
+                    formRef,
+                    edit,
+                    rules,
+                    saving,
+                    nextPreview,
+                    openEdit,
+                    handleActionCommand,
+                    save,
+                    remove,
+                    completeCurrent,
+                    delayOneDay,
+                    goBack,
+                    goCreate
+                };
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>

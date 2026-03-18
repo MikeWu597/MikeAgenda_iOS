@@ -1,0 +1,49 @@
+{
+  "" : {
+    "diagnostics" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/MikeAgenda-primary.dia",
+    "emit-module-dependencies" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/MikeAgenda-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/MikeAgenda-primary-emit-module.dia",
+    "pch" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/MikeAgenda-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/MikeAgenda-primary.swiftdeps"
+  },
+  "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/MikeAgenda/ContentView.swift" : {
+    "const-values" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/ContentView.swiftconstvalues",
+    "dependencies" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/ContentView.d",
+    "diagnostics" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/ContentView.dia",
+    "index-unit-output-path" : "/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/ContentView.o",
+    "llvm-bc" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/ContentView.bc",
+    "object" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/ContentView.o",
+    "swift-dependencies" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/ContentView.swiftdeps",
+    "swiftmodule" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/ContentView~partial.swiftmodule"
+  },
+  "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/MikeAgenda/MikeAgendaApp.swift" : {
+    "const-values" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/MikeAgendaApp.swiftconstvalues",
+    "dependencies" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/MikeAgendaApp.d",
+    "diagnostics" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/MikeAgendaApp.dia",
+    "index-unit-output-path" : "/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/MikeAgendaApp.o",
+    "llvm-bc" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/MikeAgendaApp.bc",
+    "object" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/MikeAgendaApp.o",
+    "swift-dependencies" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/MikeAgendaApp.swiftdeps",
+    "swiftmodule" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/MikeAgendaApp~partial.swiftmodule"
+  },
+  "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/MikeAgenda/MikeAgendaWebView.swift" : {
+    "const-values" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/MikeAgendaWebView.swiftconstvalues",
+    "dependencies" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/MikeAgendaWebView.d",
+    "diagnostics" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/MikeAgendaWebView.dia",
+    "index-unit-output-path" : "/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/MikeAgendaWebView.o",
+    "llvm-bc" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/MikeAgendaWebView.bc",
+    "object" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/MikeAgendaWebView.o",
+    "swift-dependencies" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/MikeAgendaWebView.swiftdeps",
+    "swiftmodule" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/MikeAgendaWebView~partial.swiftmodule"
+  },
+  "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "const-values" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftconstvalues",
+    "dependencies" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/GeneratedAssetSymbols.d",
+    "diagnostics" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/GeneratedAssetSymbols.dia",
+    "index-unit-output-path" : "/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "llvm-bc" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/GeneratedAssetSymbols.bc",
+    "object" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "swift-dependencies" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftdeps",
+    "swiftmodule" : "/Users/mikewu597/Dev/MikeAgenda_iOS/MikeAgenda/build/Build/Intermediates.noindex/MikeAgenda.build/Debug-iphonesimulator/MikeAgenda.build/Objects-normal/arm64/GeneratedAssetSymbols~partial.swiftmodule"
+  }
+}

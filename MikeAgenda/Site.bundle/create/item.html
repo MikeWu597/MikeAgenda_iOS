@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新建事项</title>
+    <link href="/vendor/element-plus/index.css" rel="stylesheet">
+    <link href="/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #f5f7fa;
+        }
+        #app {
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .page-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .page-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        .back-button {
+            margin-right: 16px;
+        }
+        .page-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #303133;
+        }
+        .form-section {
+            margin-bottom: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="page-container">
+            <div class="page-header">
+                <el-button class="back-button" circle @click="goBack">
+                    <i class="bi bi-arrow-left"></i>
+                </el-button>
+                <h1 class="page-title">新建事项</h1>
+            </div>
+
+            <el-form 
+                ref="formRef" 
+                :model="form" 
+                :rules="rules"
+                label-width="100px"
+                size="large"
+            >
+                <el-form-item label="标题" prop="title">
+                    <el-input 
+                        v-model="form.title" 
+                        placeholder="请输入事项标题"
+                        clearable
+                    />
+                </el-form-item>
+
+                <el-form-item label="描述" prop="description">
+                    <el-input 
+                        v-model="form.description" 
+                        type="textarea"
+                        :rows="4"
+                        placeholder="请输入事项描述（可选）"
+                    />
+                </el-form-item>
+
+                <el-form-item label="截止日期" prop="dueDate">
+                    <el-date-picker
+                        v-model="form.dueDate"
+                        type="date"
+                        placeholder="选择截止日期"
+                        style="width: 100%"
+                        format="YYYY-MM-DD"
+                        value-format="YYYY-MM-DD"
+                    />
+                </el-form-item>
+
+                <el-form-item label="计划时间">
+                    <el-date-picker
+                        v-model="form.plannedTime"
+                        type="datetime"
+                        placeholder="选择计划时间（可选）"
+                        style="width: 100%"
+                        format="YYYY-MM-DD HH:mm"
+                        value-format="YYYY-MM-DD HH:mm:ss"
+                    />
+                </el-form-item>
+
+                <el-form-item label="分类">
+                    <el-checkbox-group v-model="form.categories">
+                        <el-checkbox 
+                            v-for="category in categories" 
+                            :key="category.id" 
+                            :label="category.id"
+                            border
+                        >
+                            {{ category.name }}
+                        </el-checkbox>
+                    </el-checkbox-group>
+                    <div style="margin-top: 8px; color: #909399; font-size: 13px;">
+                        可以选择多个分类
+                    </div>
+                </el-form-item>
+
+                <el-form-item>
+                    <el-button 
+                        type="primary" 
+                        @click="handleSubmit"
+                        :loading="loading"
+                        size="large"
+                        style="width: 200px;"
+                    >
+                        {{ loading ? '创建中...' : '创建事项' }}
+                    </el-button>
+                    <el-button 
+                        @click="goBack"
+                        size="large"
+                    >
+                        取消
+                    </el-button>
+                </el-form-item>
+            </el-form>
+        </div>
+    </div>
+
+    <script src="/vendor/vue/vue.global.prod.js"></script>
+    <script src="/vendor/element-plus/index.full.js"></script>
+    <script>
+        const { createApp, ref, reactive, onMounted } = Vue;
+        const { ElMessage } = ElementPlus;
+
+        createApp({
+            setup() {
+                const formRef = ref(null);
+                const loading = ref(false);
+                const categories = ref([]);
+                
+                const form = reactive({
+                    title: '',
+                    description: '',
+                    dueDate: '',
+                    plannedTime: '',
+                    categories: []
+                });
+
+                const rules = {
+                    title: [
+                        { required: true, message: '请输入标题', trigger: 'blur' }
+                    ],
+                    dueDate: [
+                        { required: true, message: '请选择截止日期', trigger: 'change' }
+                    ]
+                };
+
+                // 获取session
+                const getSession = () => {
+                    const cookies = document.cookie.split(';');
+                    for (const cookie of cookies) {
+                        const [name, value] = cookie.trim().split('=');
+                        if (name === 'session') {
+                            return decodeURIComponent(value);
+                        }
+                    }
+                    return null;
+                };
+
+                // 加载分类
+                const loadCategories = async () => {
+                    const session = getSession();
+                    if (!session) {
+                        ElMessage.error('未授权，请重新登录');
+                        window.location.href = '/login.html';
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch('/api/getCategories', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ session })
+                        });
+
+                        const data = await response.json();
+                        if (data.success) {
+                            categories.value = data.categories;
+                        } else if (response.status === 401) {
+                            ElMessage.error('未授权，请重新登录');
+                            window.location.href = '/login.html';
+                        } else {
+                            ElMessage.error(data.message || '加载分类失败');
+                        }
+                    } catch (error) {
+                        console.error('Error loading categories:', error);
+                        ElMessage.error('加载分类失败，请重试');
+                    }
+                };
+
+                // 提交表单
+                const handleSubmit = async () => {
+                    if (!formRef.value) return;
+
+                    await formRef.value.validate(async (valid) => {
+                        if (!valid) return;
+
+                        const session = getSession();
+                        if (!session) {
+                            ElMessage.error('未授权，请重新登录');
+                            window.location.href = '/login.html';
+                            return;
+                        }
+
+                        loading.value = true;
+                        try {
+                            const requestBody = {
+                                session,
+                                title: form.title,
+                                description: form.description,
+                                deadline: form.dueDate,
+                                category: form.categories
+                            };
+
+                            if (form.plannedTime) {
+                                requestBody.plannedTime = form.plannedTime;
+                            }
+
+                            const response = await fetch('/api/createItem', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(requestBody)
+                            });
+
+                            const data = await response.json();
+                            if (data.success) {
+                                ElMessage.success('事项创建成功');
+                                setTimeout(() => {
+                                    window.location.href = '/dash.html';
+                                }, 500);
+                            } else {
+                                ElMessage.error(data.message || '创建失败');
+                            }
+                        } catch (error) {
+                            console.error('Error creating item:', error);
+                            ElMessage.error('创建失败，请重试');
+                        } finally {
+                            loading.value = false;
+                        }
+                    });
+                };
+
+                // 返回
+                const goBack = () => {
+                    window.location.href = '/dash.html';
+                };
+
+                // 初始化
+                onMounted(() => {
+                    loadCategories();
+                });
+
+                return {
+                    formRef,
+                    form,
+                    rules,
+                    loading,
+                    categories,
+                    handleSubmit,
+                    goBack
+                };
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>

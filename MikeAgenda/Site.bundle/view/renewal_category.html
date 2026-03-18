@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>所有续费分类</title>
+    <link href="/vendor/element-plus/index.css" rel="stylesheet">
+    <link href="/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 0; background: #f5f7fa; }
+        #app { min-height: 100vh; padding: 20px; }
+        .page-container { max-width: 980px; margin: 0 auto; }
+        .page-header {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px 18px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .page-title { font-size: 20px; font-weight: 700; color: #303133; }
+        .muted { color: #909399; }
+        .color-dot { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="page-container">
+            <div class="page-header">
+                <el-button circle @click="goBack" aria-label="返回">
+                    <i class="bi bi-arrow-left"></i>
+                </el-button>
+                <div class="page-title">所有续费分类</div>
+                <div style="margin-left:auto; display:flex; gap: 8px;">
+                    <el-button type="primary" @click="goCreate">
+                        <i class="bi bi-plus-lg"></i>
+                        新建
+                    </el-button>
+                    <el-button plain @click="load" :loading="loading">
+                        <i class="bi bi-arrow-repeat"></i>
+                        刷新
+                    </el-button>
+                </div>
+            </div>
+
+            <el-card shadow="hover" style="border-radius: 12px;">
+                <el-empty v-if="!loading && categories.length === 0" description="暂无续费分类"></el-empty>
+                <el-collapse v-if="categories.length > 0" v-model="activeIds" @change="onCollapseChange">
+                    <el-collapse-item v-for="c in categories" :key="c.id" :name="String(c.id)">
+                        <template #title>
+                            <div style="display:flex; align-items:center; gap: 10px; width: 100%;">
+                                <span class="color-dot" :style="{ backgroundColor: c.color || '#dcdfe6' }"></span>
+                                <span style="font-weight: 700;">{{ c.name }}</span>
+                                <span class="muted" style="margin-left: 8px;">#{{ c.id }}</span>
+                                <span class="muted" style="margin-left: auto;">{{ (itemsByCategory[c.id]?.length ?? 0) }} 项</span>
+                            </div>
+                        </template>
+
+                        <div class="muted" style="margin-bottom: 10px;">{{ c.note || '无备注' }}</div>
+                        <div style="display:flex; gap: 8px; margin-bottom: 12px;">
+                            <el-button size="small" @click.stop="openEdit(c)">编辑</el-button>
+                            <el-button size="small" type="danger" @click.stop="remove(c)">删除</el-button>
+                        </div>
+
+                        <el-skeleton v-if="itemsLoading[c.id]" :rows="3" animated />
+                        <el-table v-if="!itemsLoading[c.id]" :data="itemsByCategory[c.id] || []" style="width: 100%" size="small" empty-text="该分类下暂无续费项目">
+                            <el-table-column label="名称" min-width="180">
+                                <template #default="{ row }">
+                                    {{ row.name || row.title || '--' }}
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="描述" min-width="260">
+                                <template #default="{ row }">
+                                    <span class="muted">{{ row.description || '无描述' }}</span>
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="到期" width="140">
+                                <template #default="{ row }">
+                                    {{ (row.expiry_date || row.expiryDate || '').split('T')[0] || '--' }}
+                                </template>
+                            </el-table-column>
+                        </el-table>
+                    </el-collapse-item>
+                </el-collapse>
+            </el-card>
+
+            <el-dialog v-model="editVisible" title="编辑续费分类" width="520px">
+                <el-form ref="formRef" :model="edit" :rules="rules" label-width="90px">
+                    <el-form-item label="名称" prop="name">
+                        <el-input v-model="edit.name" clearable />
+                    </el-form-item>
+                    <el-form-item label="颜色" prop="color">
+                        <div style="display:flex; align-items:center; gap: 12px;">
+                            <el-color-picker v-model="edit.color" />
+                            <el-input v-model="edit.color" style="max-width: 180px;" placeholder="#RRGGBB" />
+                        </div>
+                    </el-form-item>
+                    <el-form-item label="备注">
+                        <el-input v-model="edit.description" type="textarea" :rows="3" />
+                    </el-form-item>
+                </el-form>
+                <template #footer>
+                    <el-button @click="editVisible=false">取消</el-button>
+                    <el-button type="primary" :loading="saving" @click="save">保存</el-button>
+                </template>
+            </el-dialog>
+        </div>
+    </div>
+
+    <script src="/vendor/vue/vue.global.prod.js"></script>
+    <script src="/vendor/element-plus/index.full.js"></script>
+    <script>
+        const { createApp, ref, reactive, onMounted } = Vue;
+        const { ElMessage, ElMessageBox } = ElementPlus;
+
+        createApp({
+            setup() {
+                const loading = ref(true);
+                const saving = ref(false);
+                const categories = ref([]);
+                const activeIds = ref([]);
+                const itemsByCategory = reactive({});
+                const itemsLoading = reactive({});
+
+                const editVisible = ref(false);
+                const formRef = ref(null);
+                const edit = reactive({
+                    id: null,
+                    name: '',
+                    color: '#409eff',
+                    description: ''
+                });
+
+                const rules = {
+                    name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
+                    color: [{ required: true, message: '请选择颜色', trigger: 'change' }]
+                };
+
+                const getSession = () => {
+                    const cookies = document.cookie.split(';');
+                    for (const cookie of cookies) {
+                        const [name, value] = cookie.trim().split('=');
+                        if (name === 'session') return decodeURIComponent(value);
+                    }
+                    return null;
+                };
+
+                const ensureAuth = () => {
+                    const session = getSession();
+                    if (!session) {
+                        window.location.href = '/login.html';
+                        return null;
+                    }
+                    return session;
+                };
+
+                const load = async () => {
+                    const session = ensureAuth();
+                    if (!session) return;
+                    loading.value = true;
+                    try {
+                        const res = await fetch('/api/getAllRenewalCategories', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ session })
+                        });
+                        if (res.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await res.json();
+                        if (!data.success) throw new Error(data.message || '加载分类失败');
+                        categories.value = Array.isArray(data.data) ? data.data : [];
+                    } catch (e) {
+                        console.error(e);
+                        ElMessage.error(e?.message || '加载分类失败');
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                const loadItems = async (categoryId) => {
+                    const id = String(categoryId);
+                    if (itemsByCategory[id]) return;
+                    const session = ensureAuth();
+                    if (!session) return;
+                    itemsLoading[id] = true;
+                    try {
+                        const res = await fetch('/api/fetchRenewalsByCategory', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ categoryId: id, session })
+                        });
+                        if (res.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await res.json();
+                        if (!data.success) throw new Error(data.message || '加载续费项目失败');
+                        itemsByCategory[id] = Array.isArray(data.data) ? data.data : [];
+                    } catch (e) {
+                        console.error(e);
+                        ElMessage.error(e?.message || '加载续费项目失败');
+                        itemsByCategory[id] = [];
+                    } finally {
+                        itemsLoading[id] = false;
+                    }
+                };
+
+                const onCollapseChange = async (val) => {
+                    const ids = Array.isArray(val) ? val : [val];
+                    for (const id of ids) {
+                        if (id != null && id !== '') await loadItems(id);
+                    }
+                };
+
+                const openEdit = async (c) => {
+                    const session = ensureAuth();
+                    if (!session) return;
+                    try {
+                        const res = await fetch('/api/getRenewalCategoryById', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: String(c.id), session })
+                        });
+                        if (res.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await res.json();
+                        if (!data.success) throw new Error(data.message || '获取分类信息失败');
+                        const cat = data.data || c;
+                        edit.id = cat.id;
+                        edit.name = cat.name || '';
+                        edit.color = cat.color || '#409eff';
+                        edit.description = cat.note || cat.description || '';
+                        editVisible.value = true;
+                    } catch (e) {
+                        console.error(e);
+                        ElMessage.error(e?.message || '获取分类信息失败');
+                    }
+                };
+
+                const save = async () => {
+                    if (!formRef.value) return;
+                    await formRef.value.validate(async (valid) => {
+                        if (!valid) return;
+                        const session = ensureAuth();
+                        if (!session) return;
+                        saving.value = true;
+                        try {
+                            const res = await fetch(`/api/updateRenewalCategories/${edit.id}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    name: edit.name,
+                                    color: edit.color,
+                                    description: edit.description,
+                                    session
+                                })
+                            });
+                            if (res.status === 401) {
+                                window.location.href = '/login.html';
+                                return;
+                            }
+                            const data = await res.json();
+                            if (!data.success) throw new Error(data.message || '更新分类失败');
+                            ElMessage.success('分类已更新');
+                            editVisible.value = false;
+                            activeIds.value = [];
+                            for (const key of Object.keys(itemsByCategory)) delete itemsByCategory[key];
+                            await load();
+                        } catch (e) {
+                            console.error(e);
+                            ElMessage.error(e?.message || '更新分类失败');
+                        } finally {
+                            saving.value = false;
+                        }
+                    });
+                };
+
+                const remove = async (c) => {
+                    const session = ensureAuth();
+                    if (!session) return;
+                    try {
+                        await ElMessageBox.confirm('确定要删除这个分类吗？', '确认删除', {
+                            type: 'warning',
+                            confirmButtonText: '删除',
+                            cancelButtonText: '取消'
+                        });
+                    } catch {
+                        return;
+                    }
+
+                    try {
+                        const res = await fetch(`/api/deleteRenewalCategories/${c.id}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ session })
+                        });
+                        if (res.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await res.json();
+                        if (!data.success) throw new Error(data.message || '删除分类失败');
+                        ElMessage.success('分类已删除');
+                        activeIds.value = [];
+                        for (const key of Object.keys(itemsByCategory)) delete itemsByCategory[key];
+                        await load();
+                    } catch (e) {
+                        console.error(e);
+                        ElMessage.error(e?.message || '删除分类失败');
+                    }
+                };
+
+                const goBack = () => {
+                    window.location.href = '/dash.html';
+                };
+
+                const goCreate = () => {
+                    window.location.href = '/create/renewal_category.html';
+                };
+
+                onMounted(load);
+
+                return {
+                    loading,
+                    categories,
+                    activeIds,
+                    itemsByCategory,
+                    itemsLoading,
+                    editVisible,
+                    formRef,
+                    edit,
+                    rules,
+                    saving,
+                    load,
+                    onCollapseChange,
+                    openEdit,
+                    save,
+                    remove,
+                    goBack,
+                    goCreate
+                };
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>

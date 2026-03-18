@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>检查表</title>
+    <link href="/vendor/element-plus/index.css" rel="stylesheet">
+    <link href="/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 0; background: #f5f7fa; }
+        #app { min-height: 100vh; padding: 20px; }
+        .page-container { max-width: 980px; margin: 0 auto; }
+        .page-header {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px 18px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .page-title { font-size: 20px; font-weight: 700; color: #303133; }
+        .checklist-card { cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="page-container">
+            <div class="page-header">
+                <el-button circle @click="goBack" aria-label="返回">
+                    <i class="bi bi-arrow-left"></i>
+                </el-button>
+                <div class="page-title">检查表</div>
+                <div style="margin-left:auto; display:flex; gap: 8px;">
+                    <el-button plain @click="reload" :loading="loading">
+                        <i class="bi bi-arrow-repeat"></i>
+                        刷新
+                    </el-button>
+                    <el-button type="primary" plain @click="goEdit">
+                        <i class="bi bi-pencil"></i>
+                        编辑
+                    </el-button>
+                </div>
+            </div>
+
+            <el-card shadow="hover" style="border-radius: 12px;" v-loading="loading">
+                <el-empty v-if="!loading && checklists.length === 0" description="暂无检查表"></el-empty>
+
+                <el-row v-if="checklists.length > 0" :gutter="12">
+                    <el-col v-for="c in checklists" :key="c.id" :xs="24" :sm="12" :md="8" style="margin-bottom: 12px;">
+                        <el-card class="checklist-card" shadow="hover" @click="openChecklist(c.id)" style="border-radius: 12px;">
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap: 12px;">
+                                <div style="font-weight: 700; overflow:hidden; text-overflow: ellipsis; white-space: nowrap;">{{ c.name }}</div>
+                                <i class="bi bi-chevron-right" style="color:#909399;"></i>
+                            </div>
+                        </el-card>
+                    </el-col>
+                </el-row>
+            </el-card>
+        </div>
+    </div>
+
+    <script src="/vendor/vue/vue.global.prod.js"></script>
+    <script src="/vendor/element-plus/index.full.js"></script>
+    <script src="/js/checklist_api.js"></script>
+    <script>
+        const { createApp, ref, onMounted } = Vue;
+        const { ElMessage } = ElementPlus;
+
+        createApp({
+            setup() {
+                const loading = ref(true);
+                const checklists = ref([]);
+
+                const goBack = () => {
+                    window.location.href = '/';
+                };
+
+                const goEdit = () => {
+                    window.location.href = '/view/checklists_edit.html';
+                };
+
+                const openChecklist = (id) => {
+                    window.location.href = `/view/checklist.html?id=${id}`;
+                };
+
+                const reload = async () => {
+                    loading.value = true;
+                    try {
+                        const data = await MikeChecklistApi.getChecklists();
+                        if (!data) return;
+                        if (!data.success) throw new Error(data.message || '加载检查表失败');
+                        checklists.value = Array.isArray(data.checklists) ? data.checklists : [];
+                    } catch (e) {
+                        console.error(e);
+                        ElMessage.error(e?.message || '加载检查表失败');
+                        checklists.value = [];
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                onMounted(reload);
+
+                return {
+                    loading,
+                    checklists,
+                    goBack,
+                    goEdit,
+                    openChecklist,
+                    reload
+                };
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>

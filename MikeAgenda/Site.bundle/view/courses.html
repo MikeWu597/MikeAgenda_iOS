@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>课程表</title>
+    <link href="/vendor/element-plus/index.css" rel="stylesheet">
+    <link href="/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            background: #f5f7fa;
+        }
+
+        #app {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 18px;
+        }
+
+        .page-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 20px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .canvas-wrap {
+            overflow: auto;
+            border: 1px solid #ebeef5;
+            border-radius: 12px;
+            background: #fff;
+        }
+
+        .schedule {
+            width: 100%;
+            min-width: 0;
+            color: #303133;
+        }
+
+        .schedule-header {
+            display: grid;
+            grid-template-columns: var(--time-col-w) repeat(7, 1fr);
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: #fff;
+            border-bottom: 1px solid #ebeef5;
+        }
+
+        .schedule-header .head-cell {
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 600;
+            background: #f7f9fc;
+            border-right: 1px solid #ebeef5;
+        }
+
+        .schedule-header .head-cell.time-head {
+            background: #ffffff;
+        }
+
+        .schedule-body {
+            display: grid;
+            grid-template-columns: var(--time-col-w) repeat(7, 1fr);
+            min-height: var(--body-h);
+        }
+
+        .time-col {
+            position: relative;
+            background: #fff;
+            border-right: 1px solid #ebeef5;
+            height: var(--body-h);
+            box-sizing: border-box;
+            background-image: repeating-linear-gradient(
+                to bottom,
+                transparent 0,
+                transparent calc(var(--row-h) - 1px),
+                #ebeef5 calc(var(--row-h) - 1px),
+                #ebeef5 var(--row-h)
+            );
+            background-position-y: calc(var(--grid-offset-y) - var(--row-h));
+        }
+
+        .time-cell {
+            height: var(--row-h);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #606266;
+            border-bottom: 1px solid #ebeef5;
+            box-sizing: border-box;
+        }
+
+        .time-label {
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #606266;
+            transform: translateY(-50%);
+            pointer-events: none;
+            background: rgba(255, 255, 255, 0.85);
+        }
+
+        .day-col {
+            position: relative;
+            height: var(--body-h);
+            border-right: 1px solid #ebeef5;
+            box-sizing: border-box;
+            background-image: repeating-linear-gradient(
+                to bottom,
+                transparent 0,
+                transparent calc(var(--row-h) - 1px),
+                #ebeef5 calc(var(--row-h) - 1px),
+                #ebeef5 var(--row-h)
+            );
+            background-color: #ffffff;
+            background-position-y: calc(var(--grid-offset-y) - var(--row-h));
+        }
+
+        .course-card {
+            position: absolute;
+            left: 6px;
+            right: 6px;
+            cursor: pointer;
+            user-select: none;
+            overflow: hidden;
+        }
+
+        .course-card .course-code {
+            font-weight: 700;
+            font-size: 12px;
+            line-height: 16px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .course-card .course-text {
+            font-size: 12px;
+            line-height: 16px;
+            margin-top: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .muted {
+            color: #909399;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <el-card shadow="never">
+            <template #header>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap: 12px;">
+                    <div class="page-title">
+                        <el-button circle @click="goBack" title="返回">
+                            <i class="bi bi-arrow-left"></i>
+                        </el-button>
+                        <span>课程表</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap: 8px;">
+                        <el-button :loading="loading" @click="reload" title="刷新">
+                            <i class="bi bi-arrow-clockwise"></i>
+                            <span style="margin-left:6px;">刷新</span>
+                        </el-button>
+                        <el-button type="primary" @click="openCreate">
+                            <i class="bi bi-plus"></i>
+                            <span style="margin-left:6px;">添加课程</span>
+                        </el-button>
+                    </div>
+                </div>
+            </template>
+
+            <div class="muted" style="font-size: 12px; margin-bottom: 10px;">
+                提示：点击课程块可以编辑。
+            </div>
+
+            <div class="canvas-wrap" v-loading="loading">
+                <el-scrollbar :wrap-style="{ overflowX: 'hidden' }">
+                    <div class="schedule" :style="scheduleStyle">
+                        <div class="schedule-header">
+                            <div class="head-cell time-head"></div>
+                            <div class="head-cell" v-for="d in dayLabels" :key="d">{{ d }}</div>
+                        </div>
+
+                        <div class="schedule-body">
+                            <div class="time-col">
+                                <div class="time-label" v-for="t in hourTicks" :key="t" :style="timeLabelStyle(t)">
+                                    {{ formatHHMM(t) }}
+                                </div>
+                            </div>
+
+                            <div class="day-col" v-for="dayIndex in 7" :key="dayIndex">
+                                <el-card
+                                    v-for="course in coursesForDay(dayIndex - 1)"
+                                    :key="course.id"
+                                    shadow="never"
+                                    class="course-card"
+                                    :body-style="{ padding: '6px 8px' }"
+                                    :style="courseCardStyle(course)"
+                                    @click.stop="openEdit(course)"
+                                >
+                                    <div class="course-code">{{ course.course_code || '' }}</div>
+                                    <div class="course-text">{{ course.course_name || '' }}</div>
+                                    <div class="course-text">{{ course.venue || '' }}</div>
+                                </el-card>
+                            </div>
+                        </div>
+                    </div>
+                </el-scrollbar>
+            </div>
+        </el-card>
+
+        <el-dialog v-model="dialog.visible" :title="dialogTitle" width="560px">
+            <el-form label-width="92px">
+                <el-form-item label="课程代码" required>
+                    <el-input v-model.trim="form.course_code" />
+                </el-form-item>
+
+                <el-form-item label="课程颜色" required>
+                    <el-color-picker v-model="form.course_color" show-alpha="false" />
+                    <span class="muted" style="margin-left: 10px;">{{ form.course_color }}</span>
+                </el-form-item>
+
+                <el-form-item label="课程名称" required>
+                    <el-input v-model.trim="form.course_name" />
+                </el-form-item>
+
+                <el-form-item label="授课地点" required>
+                    <el-input v-model.trim="form.venue" />
+                </el-form-item>
+
+                <el-form-item label="开始时间" required>
+                    <el-time-picker v-model="form.start_time" value-format="HH:mm" format="HH:mm" />
+                </el-form-item>
+
+                <el-form-item label="结束时间" required>
+                    <el-time-picker v-model="form.end_time" value-format="HH:mm" format="HH:mm" />
+                </el-form-item>
+
+                <el-form-item label="授课教师" required>
+                    <el-input v-model.trim="form.instructor_name" />
+                </el-form-item>
+
+                <el-form-item label="上课星期" required>
+                    <el-select v-model="form.day" placeholder="选择星期" style="width: 220px;">
+                        <el-option v-for="d in dayOptions" :key="d.value" :label="d.label" :value="d.value" />
+                    </el-select>
+                </el-form-item>
+
+                <el-form-item label="是否启用">
+                    <el-switch v-model="form.is_active" />
+                </el-form-item>
+            </el-form>
+
+            <template #footer>
+                <div style="display:flex; justify-content:space-between; gap: 12px;">
+                    <el-button
+                        v-if="form.id"
+                        type="danger"
+                        :loading="deleting"
+                        @click="deleteCourse"
+                    >
+                        删除
+                    </el-button>
+                    <div style="display:flex; gap: 8px; margin-left: auto;">
+                        <el-button @click="dialog.visible = false">取消</el-button>
+                        <el-button type="primary" :loading="saving" @click="saveCourse">保存</el-button>
+                    </div>
+                </div>
+            </template>
+        </el-dialog>
+    </div>
+
+    <script src="/vendor/vue/vue.global.prod.js"></script>
+    <script src="/vendor/element-plus/index.full.js"></script>
+    <script>
+        const { createApp } = Vue;
+
+        const getSessionFromCookie = () => {
+            const cookies = document.cookie.split('; ');
+            for (const cookie of cookies) {
+                const [name, value] = cookie.split('=');
+                if (name === 'session') {
+                    return decodeURIComponent(value);
+                }
+            }
+            return null;
+        };
+
+        function parseTimeToMinutes(hhmm) {
+            if (!hhmm || typeof hhmm !== 'string' || !hhmm.includes(':')) return null;
+            const [h, m] = hhmm.split(':').map(x => parseInt(x, 10));
+            if (Number.isNaN(h) || Number.isNaN(m)) return null;
+            return h * 60 + m;
+        }
+
+        function parseHexColorToRgb(hex) {
+            if (!hex || typeof hex !== 'string') return null;
+            const normalized = hex.trim();
+            if (!normalized.startsWith('#')) return null;
+            const raw = normalized.slice(1);
+            if (raw.length === 3) {
+                const r = parseInt(raw[0] + raw[0], 16);
+                const g = parseInt(raw[1] + raw[1], 16);
+                const b = parseInt(raw[2] + raw[2], 16);
+                if ([r, g, b].some(Number.isNaN)) return null;
+                return { r, g, b };
+            }
+            if (raw.length === 6) {
+                const r = parseInt(raw.slice(0, 2), 16);
+                const g = parseInt(raw.slice(2, 4), 16);
+                const b = parseInt(raw.slice(4, 6), 16);
+                if ([r, g, b].some(Number.isNaN)) return null;
+                return { r, g, b };
+            }
+            return null;
+        }
+
+        createApp({
+            data() {
+                return {
+                    loading: false,
+                    saving: false,
+                    deleting: false,
+                    courses: [],
+                    dayOptions: [
+                        { value: 0, label: '周日' },
+                        { value: 1, label: '周一' },
+                        { value: 2, label: '周二' },
+                        { value: 3, label: '周三' },
+                        { value: 4, label: '周四' },
+                        { value: 5, label: '周五' },
+                        { value: 6, label: '周六' }
+                    ],
+                    dialog: {
+                        visible: false
+                    },
+                    form: {
+                        id: '',
+                        course_code: '',
+                        course_color: '#007bff',
+                        course_name: '',
+                        venue: '',
+                        start_time: '',
+                        end_time: '',
+                        instructor_name: '',
+                        is_active: true,
+                        day: null
+                    },
+                    scheduleMeta: {
+                        timeColumnWidth: 50,
+                        rowHeight: 100,
+                        defaultStartMin: 0,
+                        defaultEndMin: 24 * 60
+                    }
+                };
+            },
+            computed: {
+                dialogTitle() {
+                    return this.form && this.form.id ? '编辑课程' : '添加课程';
+                },
+                dayLabels() {
+                    return this.dayOptions.map(d => d.label);
+                },
+                scheduleRange() {
+                    const minutes = [];
+                    for (const c of (this.courses || [])) {
+                        const s = parseTimeToMinutes(c.start_time);
+                        const e = parseTimeToMinutes(c.end_time);
+                        if (s == null || e == null) continue;
+                        minutes.push({ s, e });
+                    }
+
+                    if (!minutes.length) {
+                        return {
+                            startMin: this.scheduleMeta.defaultStartMin,
+                            endMin: this.scheduleMeta.defaultEndMin
+                        };
+                    }
+
+                    let startMin = minutes[0].s;
+                    let endMin = minutes[0].e;
+                    for (const t of minutes) {
+                        startMin = Math.min(startMin, t.s);
+                        endMin = Math.max(endMin, t.e);
+                    }
+
+                    // 防御：确保至少有 60 分钟高度
+                    if (endMin <= startMin) {
+                        endMin = startMin + 60;
+                    }
+
+                    return { startMin, endMin };
+                },
+                hourTicks() {
+                    const { startMin, endMin } = this.scheduleRange;
+                    const first = Math.ceil(startMin / 60) * 60;
+                    const last = Math.floor(endMin / 60) * 60;
+                    if (last < first) return [];
+                    const n = Math.floor((last - first) / 60) + 1;
+                    return Array.from({ length: n }, (_, i) => first + i * 60);
+                },
+                gridOffsetPx() {
+                    // 让网格线对齐整点：第一条线出现在“下一个整点”的位置
+                    const { startMin } = this.scheduleRange;
+                    const minutesToNextHour = (60 - (startMin % 60)) % 60;
+                    return (minutesToNextHour / 60) * this.scheduleMeta.rowHeight;
+                },
+                scheduleHeight() {
+                    const { startMin, endMin } = this.scheduleRange;
+                    const totalMin = Math.max(0, endMin - startMin);
+                    const h = (totalMin / 60) * this.scheduleMeta.rowHeight;
+                    return Math.max(this.scheduleMeta.rowHeight, Math.round(h));
+                },
+                scheduleStyle() {
+                    const timeCol = `${this.scheduleMeta.timeColumnWidth}px`;
+                    const rowH = `${this.scheduleMeta.rowHeight}px`;
+                    const bodyH = `${this.scheduleHeight}px`;
+                    return {
+                        '--time-col-w': timeCol,
+                        '--row-h': rowH,
+                        '--body-h': bodyH,
+                        '--grid-offset-y': `${this.gridOffsetPx}px`
+                    };
+                }
+            },
+            methods: {
+                goBack() {
+                    window.location.href = '/dash.html';
+                },
+                formatHour(h) {
+                    const hh = String(h).padStart(2, '0');
+                    return hh;
+                },
+                formatHHMM(totalMinutes) {
+                    const m = ((totalMinutes % 60) + 60) % 60;
+                    const h = Math.floor(totalMinutes / 60);
+                    const hh = String(((h % 24) + 24) % 24).padStart(2, '0');
+                    const mm = String(m).padStart(2, '0');
+                    return `${hh}:${mm}`;
+                },
+                timeLabelStyle(tickMin) {
+                    const baseStart = this.scheduleRange.startMin;
+                    const top = ((tickMin - baseStart) / 60) * this.scheduleMeta.rowHeight;
+                    return { top: `${top}px` };
+                },
+                requireSessionOrRedirect() {
+                    const session = getSessionFromCookie();
+                    if (!session) {
+                        ElementPlus.ElMessage.error('未授权，请重新登录');
+                        window.location.href = '/login.html';
+                        return null;
+                    }
+                    return session;
+                },
+                resetForm() {
+                    this.form = {
+                        id: '',
+                        course_code: '',
+                        course_color: '#007bff',
+                        course_name: '',
+                        venue: '',
+                        start_time: '',
+                        end_time: '',
+                        instructor_name: '',
+                        is_active: true,
+                        day: null
+                    };
+                },
+                openCreate() {
+                    this.resetForm();
+                    this.dialog.visible = true;
+                },
+                openEdit(course) {
+                    this.form = {
+                        id: String(course.id),
+                        course_code: course.course_code || '',
+                        course_color: course.course_color || '#007bff',
+                        course_name: course.course_name || '',
+                        venue: course.venue || '',
+                        start_time: course.start_time || '',
+                        end_time: course.end_time || '',
+                        instructor_name: course.instructor_name || '',
+                        is_active: !!course.is_active,
+                        day: typeof course.day === 'number' ? course.day : parseInt(course.day, 10)
+                    };
+                    this.dialog.visible = true;
+                },
+                coursesForDay(dayIndex) {
+                    return (this.courses || []).filter(c => {
+                        const d = typeof c.day === 'number' ? c.day : parseInt(c.day, 10);
+                        return d === dayIndex;
+                    });
+                },
+                courseCardStyle(course) {
+                    const startMin = parseTimeToMinutes(course.start_time);
+                    const endMin = parseTimeToMinutes(course.end_time);
+                    if (startMin == null || endMin == null) return { display: 'none' };
+
+                    const durationMin = Math.max(0, endMin - startMin);
+                    const baseStart = this.scheduleRange.startMin;
+                    const top = ((startMin - baseStart) / 60) * this.scheduleMeta.rowHeight;
+                    const height = Math.max(22, (durationMin / 60) * this.scheduleMeta.rowHeight);
+
+                    const rgb = parseHexColorToRgb(course.course_color || '#409EFF') || { r: 64, g: 158, b: 255 };
+                    const borderColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.55)`;
+                    const bgColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.30)`;
+
+                    if (course.is_active) {
+                        return {
+                            top: `${top}px`,
+                            height: `${height}px`,
+                            borderColor,
+                            backgroundColor: bgColor
+                        };
+                    }
+
+                    return {
+                        top: `${top}px`,
+                        height: `${height}px`,
+                        border: `2px solid ${borderColor}`,
+                        backgroundColor: 'transparent'
+                    };
+                },
+                async reload() {
+                    await this.fetchCourses();
+                },
+                async fetchCourses() {
+                    const session = this.requireSessionOrRedirect();
+                    if (!session) return;
+
+                    this.loading = true;
+                    try {
+                        const resp = await fetch('/api/getCourses', {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'session': session
+                            }
+                        });
+                        if (resp.status === 401) {
+                            ElementPlus.ElMessage.error('未授权，请重新登录');
+                            window.location.href = '/login.html';
+                            return;
+                        }
+
+                        const data = await resp.json();
+                        if (data.success) {
+                            this.courses = (data.courses || []).map(c => ({
+                                ...c,
+                                day: typeof c.day === 'number' ? c.day : parseInt(c.day, 10)
+                            }));
+                        } else {
+                            ElementPlus.ElMessage.error(data.message || '加载课程失败');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        ElementPlus.ElMessage.error('加载课程失败，请重试');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                async saveCourse() {
+                    const session = this.requireSessionOrRedirect();
+                    if (!session) return;
+
+                    if (!this.form.course_code || !this.form.course_name || !this.form.venue || !this.form.start_time || !this.form.end_time || !this.form.instructor_name) {
+                        ElementPlus.ElMessage.warning('请填写完整信息');
+                        return;
+                    }
+                    if (this.form.day === null || this.form.day === undefined || this.form.day === '') {
+                        ElementPlus.ElMessage.warning('请选择上课星期');
+                        return;
+                    }
+
+                    const payload = {
+                        id: this.form.id,
+                        course_code: this.form.course_code,
+                        course_color: this.form.course_color,
+                        course_name: this.form.course_name,
+                        venue: this.form.venue,
+                        start_time: this.form.start_time,
+                        end_time: this.form.end_time,
+                        instructor_name: this.form.instructor_name,
+                        is_active: !!this.form.is_active,
+                        day: parseInt(this.form.day, 10)
+                    };
+
+                    this.saving = true;
+                    try {
+                        const resp = await fetch('/api/addOrUpdateCourse', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ...payload, session })
+                        });
+                        if (resp.status === 401) {
+                            ElementPlus.ElMessage.error('未授权，请重新登录');
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await resp.json();
+                        if (data.success) {
+                            ElementPlus.ElMessage.success('课程已保存');
+                            this.dialog.visible = false;
+                            await this.fetchCourses();
+                        } else {
+                            ElementPlus.ElMessage.error(data.message || '保存失败');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        ElementPlus.ElMessage.error('保存失败，请重试');
+                    } finally {
+                        this.saving = false;
+                    }
+                },
+                async deleteCourse() {
+                    const session = this.requireSessionOrRedirect();
+                    if (!session) return;
+
+                    if (!this.form.id) return;
+
+                    try {
+                        await ElementPlus.ElMessageBox.confirm(
+                            '确定要删除该课程吗？',
+                            '确认删除',
+                            { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
+                        );
+                    } catch {
+                        return;
+                    }
+
+                    this.deleting = true;
+                    try {
+                        const resp = await fetch('/api/deleteCourse', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: this.form.id, session })
+                        });
+                        if (resp.status === 401) {
+                            ElementPlus.ElMessage.error('未授权，请重新登录');
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await resp.json();
+                        if (data.success) {
+                            ElementPlus.ElMessage.success('课程已删除');
+                            this.dialog.visible = false;
+                            await this.fetchCourses();
+                        } else {
+                            ElementPlus.ElMessage.error(data.message || '删除失败');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        ElementPlus.ElMessage.error('删除失败，请重试');
+                    } finally {
+                        this.deleting = false;
+                    }
+                }
+            },
+            mounted() {
+                this.fetchCourses();
+            },
+            beforeUnmount() {}
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>

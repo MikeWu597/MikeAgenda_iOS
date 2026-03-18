@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统状态</title>
+    <link href="/vendor/element-plus/index.css" rel="stylesheet">
+    <link href="/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 0; background: #f5f7fa; }
+        #app { min-height: 100vh; padding: 20px; }
+        .page-container { max-width: 720px; margin: 0 auto; }
+        .page-header {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px 18px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .page-title { font-size: 20px; font-weight: 700; color: #303133; }
+        .card { border-radius: 12px; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="page-container">
+            <div class="page-header">
+                <el-button circle @click="goBack" aria-label="返回">
+                    <i class="bi bi-arrow-left"></i>
+                </el-button>
+                <div class="page-title">系统状态</div>
+                <div style="margin-left:auto; display:flex; gap: 8px;">
+                    <el-button plain @click="goHome">
+                        <i class="bi bi-house"></i>
+                        首页
+                    </el-button>
+                    <el-button type="primary" plain @click="load" :loading="loading">
+                        <i class="bi bi-arrow-repeat"></i>
+                        刷新
+                    </el-button>
+                </div>
+            </div>
+
+            <el-card class="card" shadow="hover">
+                <template v-if="loading">
+                    <el-skeleton :rows="3" animated />
+                </template>
+
+                <template v-if="!loading">
+                    <el-descriptions :column="1" border>
+                        <el-descriptions-item label="内存占用">
+                            {{ status.memoryUsage }} MB
+                        </el-descriptions-item>
+                        <el-descriptions-item label="系统时钟">
+                            {{ status.systemTime }}
+                        </el-descriptions-item>
+                        <el-descriptions-item label="运行时间">
+                            {{ formatUptime(status.uptime) }}
+                        </el-descriptions-item>
+                    </el-descriptions>
+                </template>
+            </el-card>
+        </div>
+    </div>
+
+    <script src="/vendor/vue/vue.global.prod.js"></script>
+    <script src="/vendor/element-plus/index.full.js"></script>
+    <script>
+        const { createApp, ref, reactive, onMounted } = Vue;
+        const { ElMessage } = ElementPlus;
+
+        createApp({
+            setup() {
+                const loading = ref(true);
+                const status = reactive({
+                    memoryUsage: '--',
+                    systemTime: '--',
+                    uptime: 0
+                });
+
+                const formatUptime = (seconds) => {
+                    const s = Number(seconds || 0);
+                    const days = Math.floor(s / 86400);
+                    const hours = Math.floor((s % 86400) / 3600);
+                    const minutes = Math.floor((s % 3600) / 60);
+                    return `${days}天 ${hours}小时 ${minutes}分钟`;
+                };
+
+                const load = async () => {
+                    loading.value = true;
+                    try {
+                        const res = await fetch('/api/getSystemStatus', { cache: 'no-store' });
+                        const data = await res.json();
+                        if (!data.success) throw new Error(data.message || '获取系统状态失败');
+                        status.memoryUsage = data.status?.memoryUsage ?? '--';
+                        status.systemTime = data.status?.systemTime ?? '--';
+                        status.uptime = data.status?.uptime ?? 0;
+                    } catch (e) {
+                        console.error(e);
+                        ElMessage.error(e?.message || '获取系统状态失败');
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                const goBack = () => {
+                    window.location.href = '/dash.html';
+                };
+
+                const goHome = () => {
+                    window.location.href = '/dash.html';
+                };
+
+                onMounted(load);
+
+                return { loading, status, formatUptime, load, goBack, goHome };
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>

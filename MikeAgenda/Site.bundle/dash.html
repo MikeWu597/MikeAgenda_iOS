@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>首页</title>
+    <link href="/vendor/element-plus/index.css" rel="stylesheet">
+    <link href="/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f7fa;
+        }
+        #app {
+            min-height: 100vh;
+        }
+
+        /* 避免 Vue 未挂载前闪现 {{ }} */
+        #app[v-cloak] {
+            display: none;
+        }
+        #app-loading {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: #f5f7fa;
+            z-index: 3000;
+        }
+        #app[v-cloak] ~ #app-loading {
+            display: flex;
+        }
+        #app-loading .loading-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            padding: 18px 20px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.92);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        #app-loading .loading-spinner {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: 3px solid rgba(64, 158, 255, 0.25);
+            border-top-color: #409eff;
+            animation: appSpin 0.9s linear infinite;
+        }
+        #app-loading .loading-text {
+            font-size: 14px;
+            color: #606266;
+        }
+        @keyframes appSpin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        /* 顶部导航栏 */
+        .top-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: white;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 20px;
+        }
+        .header-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #303133;
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .header-date {
+            font-size: 18px;
+            font-weight: 500;
+            color: #409eff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* 修复：日期选择器的透明覆盖层可能挡住左右切换按钮的点击 */
+        .header-date > .el-button {
+            position: relative;
+            z-index: 3;
+        }
+        .header-date .date-text {
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* 顶部日期：点击直接弹出日历（不使用模态框） */
+        .header-date .date-trigger {
+            position: relative;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            border-radius: 8px;
+            user-select: none;
+        }
+        .header-date .date-trigger:hover {
+            background: rgba(64, 158, 255, 0.08);
+        }
+        .header-date .date-picker-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 2;
+        }
+        .header-date .date-picker-overlay .el-input__wrapper {
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            box-shadow: none;
+        }
+        .header-date .date-picker-overlay .el-input__inner {
+            cursor: pointer;
+        }
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+        /* 主内容区 */
+        .main-content {
+            padding-top: 80px;
+            padding-bottom: 80px;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding-left: 20px;
+            padding-right: 20px;
+        }
+        /* 布局网格 */
+        .content-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        @media (max-width: 768px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        /* 卡片样式 */
+        .section-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #303133;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .section-icon {
+            font-size: 20px;
+            margin-right: 8px;
+        }
+        /* 待办事项样式 */
+        .item-card {
+            padding: 12px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            border: 1px solid #e4e7ed;
+            cursor: pointer;
+            transition: all 0.3s;
+            overflow: hidden;
+        }
+        .item-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        .item-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: #303133;
+            margin-bottom: 8px;
+        }
+        .item-meta {
+            font-size: 13px;
+            color: #909399;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .item-tag {
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .project-color-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            margin-right: 8px;
+            flex: 0 0 auto;
+        }
+
+        .count-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 22px;
+            height: 18px;
+            padding: 0 6px;
+            margin-left: 8px;
+            font-size: 12px;
+            line-height: 18px;
+            color: #fff;
+            background: #409eff;
+            border-radius: 999px;
+        }
+        /* 底部悬浮菜单 */
+        .float-menu {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 1000;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #909399;
+        }
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        /* “+”下拉菜单两栏布局 */
+        .plus-dropdown-menu {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(140px, 1fr));
+            column-gap: 8px;
+            row-gap: 4px;
+            min-width: 320px;
+        }
+        .plus-dropdown-menu .el-dropdown-menu__item {
+            white-space: nowrap;
+        }
+        .plus-dropdown-menu .el-dropdown-menu__item--divided {
+            grid-column: 1 / -1;
+        }
+
+        @media (max-width: 420px) {
+            .plus-dropdown-menu {
+                grid-template-columns: 1fr;
+                min-width: 220px;
+            }
+        }
+
+        /* 首页待办事项：移动端适配，避免超宽 */
+        .todo-title-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+        .todo-tags {
+            display: inline-flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            max-width: 100%;
+        }
+        .todo-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
+            flex: 1 1 auto;
+        }
+
+        @media (max-width: 520px) {
+            .todo-title-row {
+                flex-wrap: wrap;
+                align-items: flex-start;
+            }
+            .todo-tags {
+                flex: 1 1 100%;
+            }
+            .todo-text {
+                flex: 1 1 100%;
+                white-space: normal;
+                overflow: visible;
+                text-overflow: clip;
+                word-break: break-word;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app" v-cloak>
+        <!-- 顶部导航栏 -->
+        <div class="top-header">
+            <div class="header-title"></div>
+            <div class="header-date">
+                <el-button circle size="small" @click="changeDate(-1)">
+                    <i class="bi bi-chevron-left"></i>
+                </el-button>
+                <div class="date-text date-trigger" title="点击选择日期">
+                    <i class="bi bi-calendar3"></i>
+                    <span>{{ formattedDate }}</span>
+                    <el-date-picker
+                        v-model="selectedDate"
+                        type="date"
+                        format="YYYY-MM-DD"
+                        :clearable="false"
+                        :editable="false"
+                        class="date-picker-overlay"
+                        @change="onDateChange"
+                    />
+                </div>
+                <el-button circle size="small" @click="changeDate(1)">
+                    <i class="bi bi-chevron-right"></i>
+                </el-button>
+            </div>
+        </div>
+
+        <!-- 主内容区 -->
+        <div class="main-content">
+            <!-- 内容网格 -->
+            <div class="content-grid">
+                <!-- 课表 -->
+                <div class="section-card" v-if="teachingStatus === '1' && courses.length > 0">
+                    <div class="section-title">
+                        <span><i class="bi bi-calendar-week section-icon"></i>课表 <span class="count-badge">{{ courses.length }}</span></span>
+                        <el-button type="primary" size="small" @click="goToPage('/view/courses.html')">
+                            <i class="bi bi-gear"></i> 管理
+                        </el-button>
+                    </div>
+                    <div v-for="course in courses" :key="course.id || (course.course_code + '-' + course.start_time + '-' + course.end_time)" class="item-card">
+                        <div class="item-title">
+                            <span style="font-weight:600; margin-right:10px;">{{ course.start_time }} - {{ course.end_time }}</span>
+                            <span
+                                v-if="course.course_code"
+                                class="item-tag"
+                                :style="{ backgroundColor: course.course_color || '#409eff', color: '#fff' }"
+                            >{{ course.course_code }}</span>
+                        </div>
+                        <div class="item-meta">
+                            <span>{{ course.course_name || '' }}</span>
+                            <span v-if="course.venue"><i class="bi bi-geo-alt"></i> {{ course.venue }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 待办事项（始终显示） -->
+                <div class="section-card">
+                    <div class="section-title">
+                        <span><i class="bi bi-check-circle section-icon"></i>待办事项 <span class="count-badge">{{ items.length }}</span></span>
+                        <el-button type="primary" size="small" @click="goToPage('/view/item.html')">
+                            <i class="bi bi-gear"></i> 管理
+                        </el-button>
+                    </div>
+                    <template v-if="items.length > 0">
+                        <div v-for="item in items" :key="item.id" class="item-card" @click="goToPage('/view/item.html')">
+                            <div class="item-title todo-title-row">
+                                <span v-if="item.categoryTags && item.categoryTags.length" class="todo-tags">
+                                    <el-tag
+                                        v-for="c in item.categoryTags"
+                                        :key="String(c.id)"
+                                        size="small"
+                                        effect="dark"
+                                        :style="{ backgroundColor: c.color || '#409EFF', borderColor: c.color || '#409EFF' }"
+                                    >
+                                        {{ c.name }}
+                                    </el-tag>
+                                </span>
+                                <span class="todo-text">
+                                    {{ item.title }}
+                                </span>
+                            </div>
+                            <div class="item-meta">
+                                <span v-if="item.deadline"><i class="bi bi-alarm"></i> {{ item.deadline }}</span>
+                            </div>
+                        </div>
+                    </template>
+                    <div v-else class="empty-state">
+                        <div class="empty-icon"><i class="bi bi-inbox"></i></div>
+                        <div>今天没有待办事项</div>
+                    </div>
+                </div>
+
+                <!-- 周期任务 -->
+                <div class="section-card" v-if="cycles.length > 0">
+                    <div class="section-title">
+                        <span><i class="bi bi-arrow-repeat section-icon"></i>周期任务 <span class="count-badge">{{ cycles.length }}</span></span>
+                        <el-button type="primary" size="small" @click="goToPage('/view/cycle.html')">
+                            <i class="bi bi-gear"></i> 管理
+                        </el-button>
+                    </div>
+                    <div v-for="cycle in cycles" :key="cycle.id" class="item-card" @click="goToPage('/view/cycle.html')">
+                        <div class="item-title">{{ cycle.name || cycle.title || '' }}</div>
+                        <div class="item-meta">
+                            <span><i class="bi bi-calendar-event"></i> {{ cycle._formattedCycle || '' }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 续订提醒 -->
+                <div class="section-card" v-if="renewals.length > 0">
+                    <div class="section-title">
+                        <span><i class="bi bi-bell section-icon"></i>续订提醒 <span class="count-badge">{{ renewals.length }}</span></span>
+                        <el-button type="primary" size="small" @click="goToPage('/view/renewal.html')">
+                            <i class="bi bi-gear"></i> 管理
+                        </el-button>
+                    </div>
+                    <div v-for="renewal in renewals" :key="renewal.id" class="item-card" @click="goToPage('/view/renewal.html')">
+                        <div class="item-title">{{ renewal.name }}</div>
+                        <div class="item-meta">
+                            <span><i class="bi bi-calendar-check"></i> {{ (renewal.expiry_date || '').split('T')[0] || '--' }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 项目 -->
+                <div class="section-card" v-if="projects.length > 0">
+                    <div class="section-title">
+                        <span><i class="bi bi-folder section-icon"></i>项目 <span class="count-badge">{{ projects.length }}</span></span>
+                        <el-button type="primary" size="small" @click="goToPage('/view/project.html')">
+                            <i class="bi bi-gear"></i> 管理
+                        </el-button>
+                    </div>
+                    <div
+                        v-for="project in projects"
+                        :key="project.id"
+                        class="item-card"
+                        :style="{ backgroundColor: projectParticipation[project.id] ? '#cce5ff' : 'transparent' }"
+                        @click="goToProject(project.id)"
+                    >
+                        <div class="item-title" style="display:flex; align-items:center;">
+                            <span class="project-color-indicator" :style="{ backgroundColor: project.color || '#409eff' }"></span>
+                            <span>{{ project.name }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部悬浮菜单 -->
+        <div class="float-menu">
+            <el-dropdown trigger="click" placement="top">
+                <el-button type="primary" circle size="large">
+                    <i class="bi bi-plus-lg" style="font-size: 20px;"></i>
+                </el-button>
+                <template #dropdown>
+                    <el-dropdown-menu class="plus-dropdown-menu">
+                        <el-dropdown-item @click="goToPage('/view/item.html')">
+                            <i class="bi bi-list-check"></i> 事项
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="goToPage('/view/courses.html')">
+                            <i class="bi bi-calendar-week"></i> 课程表
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="goToPage('/view/cycle.html')">
+                            <i class="bi bi-arrow-repeat"></i> 周期
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="goToPage('/view/renewal.html')">
+                            <i class="bi bi-bell"></i> 续订
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="goToPage('/view/renewal_category.html')">
+                            <i class="bi bi-tags"></i> 续费分类
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="goToPage('/view/project.html')">
+                            <i class="bi bi-folder"></i> 项目
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="goToPage('/view/category.html')">
+                            <i class="bi bi-tags"></i> 分类
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="goToPage('/view/checklists.html')">
+                            <i class="bi bi-card-checklist"></i> 检查清单
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="goToPage('/about.html')">
+                            <i class="bi bi-info-circle"></i> 关于
+                        </el-dropdown-item>
+                        <el-dropdown-item divided @click="goToPage('/settings.html')">
+                            <i class="bi bi-gear"></i> 设置
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="goToPage('/status.html')">
+                            <i class="bi bi-activity"></i> 系统状态
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="logout">
+                            <i class="bi bi-box-arrow-right"></i> 退出登录
+                        </el-dropdown-item>
+                        <el-dropdown-item divided @click="goToPage('/tool/farm.html')">
+                            <i class="bi bi-camera"></i> 农场监控
+                        </el-dropdown-item>
+
+                        <el-dropdown-item divided @click="openFoodOrder">
+                            <i class="bi bi-shop"></i> 学校点餐
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="openNoodleOrder">
+                            <i class="bi bi-bag"></i> 遇见小面点餐
+                        </el-dropdown-item>
+                    </el-dropdown-menu>
+                </template>
+            </el-dropdown>
+        </div>
+
+    </div>
+
+    <div id="app-loading" role="status" aria-label="加载中">
+        <div class="loading-box">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">加载中...</div>
+        </div>
+    </div>
+
+    <script src="/vendor/vue/vue.global.prod.js"></script>
+    <script src="/vendor/element-plus/index.full.js"></script>
+    <script src="/vendor/element-plus-icons/icons-vue.iife.min.js"></script>
+    <script>
+        const { createApp, ref, reactive, computed, onMounted, onBeforeUnmount } = Vue;
+        const { ElMessage, ElMessageBox } = ElementPlus;
+
+        createApp({
+            setup() {
+                const currentDate = ref(new Date());
+                const selectedDate = ref(new Date());
+                
+                const items = ref([]);
+                const cycles = ref([]);
+                const renewals = ref([]);
+                const projects = ref([]);
+                const categories = ref([]);
+                const courses = ref([]);
+                const teachingStatus = ref('0');
+                const projectParticipation = ref({});
+                const loadingAll = ref(false);
+
+                let autoRefreshTimer = null;
+                const autoRefreshSeconds = ref(null);
+
+                // 格式化日期显示
+                const formattedDate = computed(() => {
+                    const date = currentDate.value;
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                });
+
+                // 获取session
+                const getSession = () => {
+                    const cookies = document.cookie.split(';');
+                    for (const cookie of cookies) {
+                        const [name, value] = cookie.trim().split('=');
+                        if (name === 'session') {
+                            return decodeURIComponent(value);
+                        }
+                    }
+                    return null;
+                };
+
+                const getCookie = (cookieName) => {
+                    const cookies = document.cookie.split(';');
+                    for (const cookie of cookies) {
+                        const [name, value] = cookie.trim().split('=');
+                        if (name === cookieName) {
+                            return decodeURIComponent(value || '');
+                        }
+                    }
+                    return null;
+                };
+
+                const readAutoRefreshSeconds = () => {
+                    const raw = getCookie('refreshInterval');
+                    const n = raw ? parseInt(String(raw), 10) : NaN;
+                    return Number.isFinite(n) && n > 0 ? n : null;
+                };
+
+                const stopAutoRefresh = () => {
+                    if (autoRefreshTimer) {
+                        clearInterval(autoRefreshTimer);
+                        autoRefreshTimer = null;
+                    }
+                };
+
+                const startAutoRefresh = () => {
+                    stopAutoRefresh();
+
+                    const seconds = readAutoRefreshSeconds();
+                    autoRefreshSeconds.value = seconds;
+                    if (!seconds) return;
+
+                    autoRefreshTimer = setInterval(async () => {
+                        if (document.visibilityState === 'hidden') return;
+                        await loadAllData();
+                    }, seconds * 1000);
+                };
+
+                // 检查授权
+                const checkAuth = async () => {
+                    const session = getSession();
+                    if (!session) {
+                        window.location.href = '/login.html';
+                        return false;
+                    }
+                    return true;
+                };
+
+                const safeJsonParse = (value, fallback) => {
+                    try {
+                        if (!value) return fallback;
+                        if (typeof value !== 'string') return fallback;
+                        return JSON.parse(value);
+                    } catch {
+                        return fallback;
+                    }
+                };
+
+                const parseCycle = (cycleRow) => {
+                    const parsed = safeJsonParse(cycleRow && cycleRow.cycle, {});
+                    const cycleType = String(parsed && parsed.cycle ? parsed.cycle : '');
+                    const configObj = safeJsonParse(parsed && parsed.config, {});
+                    return { cycleType, configObj };
+                };
+
+                const formatCycleConfig = (cycleType, configObj) => {
+                    if (cycleType === 'weekly') {
+                        const daysOfWeek = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+                        const raw = String(configObj && configObj.day != null ? configObj.day : '');
+                        const first = raw.split(',')[0];
+                        const idx = Number(first);
+                        return `每周 ${daysOfWeek[idx] || first}`;
+                    }
+                    if (cycleType === 'monthly') return `每月第 ${configObj && configObj.day} 天`;
+                    if (cycleType === 'monthly_last') return `每月倒数第 ${configObj && configObj.day} 天`;
+                    if (cycleType === 'daily') return '每天';
+                    return '';
+                };
+
+                // 加载分类
+                const loadCategories = async () => {
+                    const session = getSession();
+                    try {
+                        const response = await fetch('/api/getCategories', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ session })
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            categories.value = data.categories;
+                        }
+                    } catch (error) {
+                        console.error('Error loading categories:', error);
+                    }
+                };
+
+                // 加载待办事项
+                const loadItems = async () => {
+                    const session = getSession();
+                    try {
+                        const response = await fetch('/api/getItems', {
+                            method: 'GET',
+                            headers: { 'session': session }
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            const dateStr = formattedDate.value;
+                            const extractYmd = (value) => {
+                                if (!value) return null;
+                                const s = String(value);
+                                const m = s.match(/\d{4}-\d{2}-\d{2}/);
+                                return m ? m[0] : null;
+                            };
+
+                            const extractTimeMinutes = (value) => {
+                                if (!value) return null;
+                                const s = String(value);
+                                const m = s.match(/(\d{2}):(\d{2})(?::\d{2})?/);
+                                if (!m) return null;
+                                const hh = Number(m[1]);
+                                const mm = Number(m[2]);
+                                if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+                                return hh * 60 + mm;
+                            };
+
+                            items.value = (Array.isArray(data.items) ? data.items : [])
+                                .filter((item) => {
+                                    const plannedYmd = extractYmd(item && item.planned_time);
+                                    if (plannedYmd) {
+                                        // 设置了计划日期：只在计划日期当天显示（优先级高于 deadline）
+                                        return plannedYmd === dateStr;
+                                    }
+
+                                    const deadlineYmd = extractYmd(item && item.deadline);
+                                    if (deadlineYmd) {
+                                        // 未设置计划日期：在截止日期前（含当天）显示
+                                        return String(dateStr) <= String(deadlineYmd);
+                                    }
+
+                                    // 未设置计划日期/截止日期：一直显示
+                                    return true;
+                                })
+                                .sort((a, b) => {
+                                    const buildKey = (item) => {
+                                        const deadlineYmd = extractYmd(item && item.deadline);
+                                        const plannedYmd = extractYmd(item && item.planned_time);
+                                        const plannedMinutes = extractTimeMinutes(item && item.planned_time);
+
+                                        // group: 0=按截止日期，1=按计划时间，2=无日期
+                                        if (deadlineYmd) {
+                                            return {
+                                                group: 0,
+                                                ymd: String(deadlineYmd),
+                                                minutes: plannedMinutes != null ? plannedMinutes : (24 * 60 - 1)
+                                            };
+                                        }
+                                        if (plannedYmd) {
+                                            return {
+                                                group: 1,
+                                                ymd: String(plannedYmd),
+                                                minutes: plannedMinutes != null ? plannedMinutes : (24 * 60 - 1)
+                                            };
+                                        }
+                                        return {
+                                            group: 2,
+                                            ymd: '9999-12-31',
+                                            minutes: (24 * 60 - 1)
+                                        };
+                                    };
+
+                                    const ka = buildKey(a);
+                                    const kb = buildKey(b);
+                                    if (ka.group !== kb.group) return ka.group - kb.group;
+                                    if (ka.ymd !== kb.ymd) return ka.ymd.localeCompare(kb.ymd);
+                                    if (ka.minutes !== kb.minutes) return ka.minutes - kb.minutes;
+
+                                    const aTitle = String((a && a.title) || '');
+                                    const bTitle = String((b && b.title) || '');
+                                    if (aTitle !== bTitle) return aTitle.localeCompare(bTitle, 'zh-CN');
+
+                                    return Number((a && a.id) || 0) - Number((b && b.id) || 0);
+                                });
+
+                            // 为首页待办事项补齐分类（含颜色）
+                            const cats = Array.isArray(categories.value) ? categories.value : [];
+                            items.value.forEach((item) => {
+                                const raw = item && item.category;
+                                const ids = Array.isArray(raw) ? raw : safeJsonParse(raw, []);
+                                const normalizedIds = (ids || []).map(x => String(x));
+
+                                item.categoryTags = normalizedIds.map((id) => {
+                                    const c = cats.find(x => String(x.id) === String(id));
+                                    return c
+                                        ? { id: String(c.id), name: c.name, color: c.color }
+                                        : { id: String(id), name: '未知分类', color: '#909399' };
+                                });
+                            });
+                        } else if (response.status === 401) {
+                            window.location.href = '/login.html';
+                        }
+                    } catch (error) {
+                        console.error('Error loading items:', error);
+                        ElMessage.error('加载待办事项失败');
+                    }
+                };
+
+                // 加载周期任务
+                const loadCycles = async () => {
+                    const session = getSession();
+                    try {
+                        const dateStr = formattedDate.value.replace(/-/g, '');
+                        const response = await fetch('/api/getTodayCycles', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'session': session },
+                            body: JSON.stringify({ session, date: dateStr })
+                        });
+                        if (response.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await response.json();
+                        if (data.success) {
+                            const rows = Array.isArray(data.cycles) ? data.cycles : [];
+                            cycles.value = rows.map((r) => {
+                                const { cycleType, configObj } = parseCycle(r);
+                                return {
+                                    ...r,
+                                    _formattedCycle: formatCycleConfig(cycleType, configObj)
+                                };
+                            });
+                        }
+                    } catch (error) {
+                        console.error('Error loading cycles:', error);
+                    }
+                };
+
+                // 加载续订提醒
+                const loadRenewals = async () => {
+                    const session = getSession();
+                    try {
+                        const response = await fetch('/api/getAllRenewals', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ session })
+                        });
+                        if (response.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await response.json();
+                        if (data.success) {
+                            const all = Array.isArray(data.data) ? data.data : [];
+                            const selected = formattedDate.value;
+
+                            const parseYmd = (ymd) => {
+                                if (!ymd || !/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+                                const [y, m, d] = ymd.split('-').map(n => parseInt(n, 10));
+                                return new Date(y, m - 1, d);
+                            };
+
+                            const addDays = (date, days) => {
+                                const d = new Date(date.getTime());
+                                d.setDate(d.getDate() + days);
+                                return d;
+                            };
+
+                            const selectedDate = parseYmd(selected);
+                            if (!selectedDate) {
+                                renewals.value = [];
+                                return;
+                            }
+
+                            renewals.value = all.filter(r => {
+                                const expiryYmd = (r.expiry_date || '').split('T')[0];
+                                const expiryDate = parseYmd(expiryYmd);
+                                if (!expiryDate) return false;
+                                const reminderDays = Number(r.reminder_days || 0);
+                                const startDate = addDays(expiryDate, -reminderDays);
+                                return selectedDate >= startDate && selectedDate <= expiryDate;
+                            });
+                        }
+                    } catch (error) {
+                        console.error('Error loading renewals:', error);
+                    }
+                };
+
+                // 加载项目
+                const loadProjects = async () => {
+                    const session = getSession();
+                    try {
+                        const response = await fetch('/api/getProjects', {
+                            method: 'GET',
+                            headers: { 'Content-Type': 'application/json', 'session': session }
+                        });
+                        if (response.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await response.json();
+                        if (data.success) {
+                            const list = Array.isArray(data.projects) ? data.projects : [];
+                            projects.value = list.filter(p => p);
+                        }
+                    } catch (error) {
+                        console.error('Error loading projects:', error);
+                    }
+                };
+
+                // 加载指定日期项目参与情况（旧版首页逻辑迁移）
+                const loadProjectParticipation = async () => {
+                    const session = getSession();
+                    if (!session) {
+                        projectParticipation.value = {};
+                        return;
+                    }
+
+                    const dateStr = formattedDate.value; // YYYY-MM-DD
+                    const list = Array.isArray(projects.value) ? projects.value : [];
+                    if (list.length === 0) {
+                        projectParticipation.value = {};
+                        return;
+                    }
+
+                    const pairs = await Promise.all(
+                        list.map(async (project) => {
+                            try {
+                                const response = await fetch(`/api/getProjectRecords/${project.id}`, {
+                                    method: 'GET',
+                                    headers: { 'Content-Type': 'application/json', 'session': session }
+                                });
+                                if (!response.ok) {
+                                    return [project.id, false];
+                                }
+                                const data = await response.json();
+                                if (!data || !data.success || !Array.isArray(data.records)) {
+                                    return [project.id, false];
+                                }
+                                const has = data.records.some((record) => {
+                                    const ts = String(record.timestamp || '');
+                                    const ymd = ts.includes(' ') ? ts.split(' ')[0] : ts.split('T')[0];
+                                    return ymd === dateStr;
+                                });
+                                return [project.id, has];
+                            } catch (error) {
+                                console.error('Error loading project records:', error);
+                                return [project.id, false];
+                            }
+                        })
+                    );
+
+                    projectParticipation.value = Object.fromEntries(pairs);
+                };
+
+                // 获取授课状态（旧版首页逻辑迁移）
+                const loadTeachingStatus = async () => {
+                    const session = getSession();
+                    if (!session) {
+                        teachingStatus.value = '0';
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch('/api/getTeachingStatus', {
+                            method: 'GET',
+                            headers: { 'Content-Type': 'application/json', 'session': session }
+                        });
+                        if (response.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await response.json();
+                        teachingStatus.value = data && data.success ? String(data.teaching ?? '0') : '0';
+                    } catch (error) {
+                        console.error('Error loading teaching status:', error);
+                        teachingStatus.value = '0';
+                    }
+                };
+
+                // 加载当天课表（按旧版：按星期过滤；若为今天过滤已结束课程）
+                const loadCourses = async () => {
+                    const session = getSession();
+                    if (!session) {
+                        courses.value = [];
+                        return;
+                    }
+
+                    // 先检查授课状态
+                    await loadTeachingStatus();
+                    if (teachingStatus.value !== '1') {
+                        courses.value = [];
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch('/api/getCourses', {
+                            method: 'GET',
+                            headers: { 'Content-Type': 'application/json', 'session': session }
+                        });
+                        if (response.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+
+                        const data = await response.json();
+                        if (!data || !data.success) {
+                            courses.value = [];
+                            return;
+                        }
+
+                        const list = Array.isArray(data.courses) ? data.courses : [];
+                        const date = currentDate.value;
+                        const dayOfWeek = date.getDay();
+
+                        const filtered = list
+                            .filter(c => c && c.is_active && c.day === dayOfWeek)
+                            .sort((a, b) => {
+                                const [ah, am] = String(a.start_time || '00:00').split(':').map(Number);
+                                const [bh, bm] = String(b.start_time || '00:00').split(':').map(Number);
+                                return (ah - bh) || (am - bm);
+                            });
+
+                        const now = new Date();
+                        const isToday = date.toDateString() === now.toDateString();
+                        const display = isToday
+                            ? filtered.filter(c => {
+                                const [eh, em] = String(c.end_time || '00:00').split(':').map(Number);
+                                const endTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), eh, em, 0, 0);
+                                return endTime > now;
+                            })
+                            : filtered;
+
+                        courses.value = display;
+                    } catch (error) {
+                        console.error('Error loading courses:', error);
+                        courses.value = [];
+                        ElMessage.error('加载课程失败');
+                    }
+                };
+
+                // 加载所有数据
+                const loadAllData = async () => {
+                    if (loadingAll.value) return;
+                    loadingAll.value = true;
+
+                    await loadCategories();
+
+                    try {
+                        await Promise.all([
+                            loadItems(),
+                            loadCycles(),
+                            loadRenewals(),
+                            loadProjects(),
+                            loadCourses()
+                        ]);
+
+                        // 依赖 projects 已加载
+                        await loadProjectParticipation();
+                    } finally {
+                        loadingAll.value = false;
+                    }
+                };
+
+                // 切换日期
+                const changeDate = (offset) => {
+                    const newDate = new Date(currentDate.value);
+                    newDate.setDate(newDate.getDate() + offset);
+                    currentDate.value = newDate;
+                    selectedDate.value = newDate;
+                    loadAllData();
+                };
+
+                // 日期改变
+                const onDateChange = (date) => {
+                    if (date) {
+                        currentDate.value = date;
+                        loadAllData();
+                    }
+                };
+
+                // 页面跳转
+                const goToPage = (url) => {
+                    window.location.href = url;
+                };
+
+                // 跳转到项目详情
+                const goToProject = (projectId) => {
+                    window.location.href = `/view/project_detail.html?id=${projectId}`;
+                };
+
+                // 新增: 学校点餐系统
+                const openFoodOrder = () => {
+                    window.open('https://csd.order.place/store/112871/mode/prekiosk?_aigens_source=scan&onpremise=true', '_blank');
+                };
+
+                // 新增: 遇见小面点餐系统
+                const openNoodleOrder = () => {
+                    window.open('https://h5.xiaonoodles.com/materialQrcodeId=1839797535331319808', '_blank');
+                };
+
+                // 登出
+                const logout = async () => {
+                    try {
+                        await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+                            confirmButtonText: '确定',
+                            cancelButtonText: '取消',
+                            type: 'warning'
+                        });
+                        document.cookie = 'session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+                        window.location.href = '/login.html';
+                    } catch (error) {
+                        // 用户取消
+                    }
+                };
+
+                // 初始化
+                onMounted(async () => {
+                    if (await checkAuth()) {
+                        // 检查URL参数中的日期
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const dateParam = urlParams.get('date');
+                        if (dateParam) {
+                            const date = new Date(dateParam.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
+                            if (!isNaN(date.getTime())) {
+                                currentDate.value = date;
+                                selectedDate.value = date;
+                            }
+                        }
+                        await loadAllData();
+
+                        // 自动刷新（读取 settings.html 写入的 cookie：refreshInterval）
+                        startAutoRefresh();
+
+                        const onVisible = () => {
+                            if (document.visibilityState === 'visible') {
+                                // 回到前台时重读配置，立即生效
+                                startAutoRefresh();
+                            }
+                        };
+                        document.addEventListener('visibilitychange', onVisible);
+                        window.addEventListener('focus', startAutoRefresh);
+
+                        onBeforeUnmount(() => {
+                            document.removeEventListener('visibilitychange', onVisible);
+                            window.removeEventListener('focus', startAutoRefresh);
+                            stopAutoRefresh();
+                        });
+                    }
+                });
+
+                return {
+                    currentDate,
+                    formattedDate,
+                    selectedDate,
+                    items,
+                    cycles,
+                    renewals,
+                    projects,
+                    courses,
+                    teachingStatus,
+                    projectParticipation,
+                    autoRefreshSeconds,
+                    changeDate,
+                    onDateChange,
+                    goToPage,
+                    goToProject,
+                    openFoodOrder,
+                    openNoodleOrder,
+                    logout
+                };
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>

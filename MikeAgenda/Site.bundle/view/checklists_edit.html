@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>编辑检查表</title>
+    <link href="/vendor/element-plus/index.css" rel="stylesheet">
+    <link href="/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            background: #f5f7fa;
+        }
+
+        #app {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 18px;
+        }
+
+        .page-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 20px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .sortable-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: #fff;
+            border: 1px solid #ebeef5;
+        }
+
+        .sortable-item + .sortable-item {
+            margin-top: 10px;
+        }
+
+        .sortable-item.dragging {
+            opacity: 0.55;
+        }
+
+        .drag-handle {
+            cursor: grab;
+            color: #909399;
+            font-size: 18px;
+            line-height: 1;
+            user-select: none;
+        }
+
+        .name {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .name strong {
+            font-weight: 700;
+        }
+
+        .muted {
+            color: #909399;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <el-card shadow="never">
+            <template #header>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap: 12px;">
+                    <div class="page-title">
+                        <el-button circle @click="goBack" title="返回">
+                            <i class="bi bi-arrow-left"></i>
+                        </el-button>
+                        <span>编辑检查表</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap: 8px;">
+                        <el-button :loading="loading" @click="reload" title="刷新">
+                            <i class="bi bi-arrow-clockwise"></i>
+                            <span style="margin-left:6px;">刷新</span>
+                        </el-button>
+                        <el-button type="primary" @click="openChecklistDialogForCreate">
+                            <i class="bi bi-plus"></i>
+                            <span style="margin-left:6px;">添加检查表</span>
+                        </el-button>
+                    </div>
+                </div>
+            </template>
+
+            <div v-loading="loading">
+                <el-empty v-if="!checklists.length" description="暂无检查表"></el-empty>
+
+                <div v-if="checklists.length">
+                    <div
+                        v-for="c in checklists"
+                        :key="c.id"
+                        class="sortable-item"
+                        :class="{ dragging: drag.type === 'checklist' && drag.id === String(c.id) }"
+                        draggable="true"
+                        @dragstart="onDragStart($event, 'checklist', String(c.id))"
+                        @dragend="onDragEnd('checklist')"
+                        @dragover.prevent="onDragOver('checklist', String(c.id))"
+                    >
+                        <span class="drag-handle" title="拖拽排序">
+                            <i class="bi bi-grip-vertical"></i>
+                        </span>
+                        <div class="name">
+                            <strong>{{ c.name }}</strong>
+                            <span class="muted" style="margin-left:10px;">#{{ c.id }}</span>
+                        </div>
+                        <div style="display:flex; gap: 8px;">
+                            <el-button @click="openChecklistDialogForEdit(c)" title="编辑">
+                                <i class="bi bi-pencil"></i>
+                            </el-button>
+                            <el-button type="success" @click="openItemsDialog(c)" title="编辑检查项">
+                                <i class="bi bi-list-check"></i>
+                            </el-button>
+                            <el-button type="danger" @click="deleteChecklist(c)" title="删除">
+                                <i class="bi bi-trash"></i>
+                            </el-button>
+                        </div>
+                    </div>
+
+                    <div class="muted" style="margin-top: 12px; font-size: 12px;">
+                        提示：支持拖拽排序，顺序会自动保存。
+                    </div>
+                </div>
+            </div>
+        </el-card>
+
+        <!-- Checklist Dialog -->
+        <el-dialog v-model="checklistDialog.visible" :title="checklistDialog.title" width="520px">
+            <el-form label-width="92px">
+                <el-form-item label="检查表名称">
+                    <el-input v-model.trim="checklistDialog.form.name" placeholder="请输入检查表名称"></el-input>
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <el-button @click="checklistDialog.visible = false">取消</el-button>
+                <el-button type="primary" :loading="checklistDialog.saving" @click="saveChecklist">
+                    保存
+                </el-button>
+            </template>
+        </el-dialog>
+
+        <!-- Items Dialog -->
+        <el-dialog v-model="itemsDialog.visible" :title="itemsDialog.title" width="760px">
+            <template #header>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap: 12px;">
+                    <div>
+                        <div style="font-weight: 700;">编辑检查项</div>
+                        <div class="muted" style="font-size: 12px; margin-top: 4px;">{{ itemsDialog.checklistName }}</div>
+                    </div>
+                    <el-button type="primary" @click="openItemDialogForCreate">
+                        <i class="bi bi-plus"></i>
+                        <span style="margin-left:6px;">添加检查项</span>
+                    </el-button>
+                </div>
+            </template>
+
+            <div v-loading="itemsDialog.loading">
+                <el-empty v-if="!items.length" description="该检查表暂无检查项"></el-empty>
+
+                <div v-if="items.length">
+                    <div
+                        v-for="it in items"
+                        :key="it.id"
+                        class="sortable-item"
+                        :class="{ dragging: drag.type === 'item' && drag.id === String(it.id) }"
+                        draggable="true"
+                        @dragstart="onDragStart($event, 'item', String(it.id))"
+                        @dragend="onDragEnd('item')"
+                        @dragover.prevent="onDragOver('item', String(it.id))"
+                    >
+                        <span class="drag-handle" title="拖拽排序">
+                            <i class="bi bi-grip-vertical"></i>
+                        </span>
+                        <div class="name">
+                            {{ it.name }}
+                            <span class="muted" style="margin-left:10px;">#{{ it.id }}</span>
+                        </div>
+                        <div style="display:flex; gap: 8px;">
+                            <el-button @click="openItemDialogForEdit(it)" title="编辑">
+                                <i class="bi bi-pencil"></i>
+                            </el-button>
+                            <el-button type="danger" @click="deleteItem(it)" title="删除">
+                                <i class="bi bi-trash"></i>
+                            </el-button>
+                        </div>
+                    </div>
+
+                    <div class="muted" style="margin-top: 12px; font-size: 12px;">
+                        提示：支持拖拽排序，顺序会自动保存。
+                    </div>
+                </div>
+            </div>
+        </el-dialog>
+
+        <!-- Item Dialog -->
+        <el-dialog v-model="itemDialog.visible" :title="itemDialog.title" width="520px">
+            <el-form label-width="92px">
+                <el-form-item label="检查项名称">
+                    <el-input v-model.trim="itemDialog.form.name" placeholder="请输入检查项名称"></el-input>
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <el-button @click="itemDialog.visible = false">取消</el-button>
+                <el-button type="primary" :loading="itemDialog.saving" @click="saveItem">
+                    保存
+                </el-button>
+            </template>
+        </el-dialog>
+    </div>
+
+    <script src="/vendor/vue/vue.global.prod.js"></script>
+    <script src="/vendor/element-plus/index.full.js"></script>
+    <script src="/js/checklist_api.js"></script>
+    <script>
+        const { createApp } = Vue;
+
+        function isUnauthorized(response) {
+            return response && response.status === 401;
+        }
+
+        createApp({
+            data() {
+                return {
+                    loading: false,
+                    checklists: [],
+                    items: [],
+                    currentChecklistId: null,
+                    currentChecklistName: '',
+
+                    drag: {
+                        type: null,
+                        id: null,
+                        lastOverId: null
+                    },
+
+                    checklistDialog: {
+                        visible: false,
+                        title: '添加检查表',
+                        saving: false,
+                        form: {
+                            id: '',
+                            name: ''
+                        }
+                    },
+
+                    itemsDialog: {
+                        visible: false,
+                        title: '编辑检查项',
+                        checklistName: '',
+                        loading: false
+                    },
+
+                    itemDialog: {
+                        visible: false,
+                        title: '添加检查项',
+                        saving: false,
+                        form: {
+                            id: '',
+                            name: ''
+                        }
+                    }
+                };
+            },
+            methods: {
+                goBack() {
+                    window.location.href = '/view/checklists.html';
+                },
+                requireSessionOrRedirect() {
+                    const session = MikeChecklistApi.ensureSessionOrRedirect();
+                    if (!session) {
+                        ElementPlus.ElMessage.error('未授权，请重新登录');
+                        window.location.href = '/login.html';
+                        return null;
+                    }
+                    return session;
+                },
+
+                async reload() {
+                    await this.loadChecklists();
+                },
+
+                async loadChecklists() {
+                    this.loading = true;
+                    try {
+                        const data = await MikeChecklistApi.getChecklists();
+                        if (!data) return;
+
+                        if (data.success) {
+                            this.checklists = (data.checklists || []).map(c => ({
+                                ...c,
+                                id: String(c.id),
+                                order_index: MikeChecklistApi.normalizeOrderIndex(c.order_index)
+                            }));
+                        } else {
+                            ElementPlus.ElMessage.error(data.message || '加载检查表失败');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        ElementPlus.ElMessage.error('加载检查表失败，请重试');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                openChecklistDialogForCreate() {
+                    this.checklistDialog.title = '添加检查表';
+                    this.checklistDialog.form.id = '';
+                    this.checklistDialog.form.name = '';
+                    this.checklistDialog.visible = true;
+                },
+                openChecklistDialogForEdit(checklist) {
+                    this.checklistDialog.title = '编辑检查表';
+                    this.checklistDialog.form.id = String(checklist.id);
+                    this.checklistDialog.form.name = checklist.name || '';
+                    this.checklistDialog.visible = true;
+                },
+                async saveChecklist() {
+                    const name = (this.checklistDialog.form.name || '').trim();
+                    if (!name) {
+                        ElementPlus.ElMessage.warning('请输入检查表名称');
+                        return;
+                    }
+
+                    const id = this.checklistDialog.form.id;
+                    const existing = id ? this.checklists.find(c => String(c.id) === String(id)) : null;
+                    const orderIndex = id
+                        ? MikeChecklistApi.normalizeOrderIndex(existing && existing.order_index)
+                        : MikeChecklistApi.nextOrderIndex(this.checklists);
+
+                    this.checklistDialog.saving = true;
+                    try {
+                        const data = id
+                            ? await MikeChecklistApi.updateChecklist(id, { name, orderIndex })
+                            : await MikeChecklistApi.createChecklist({ name, orderIndex });
+                        if (!data) return;
+
+                        if (data.success) {
+                            this.checklistDialog.visible = false;
+                            await this.loadChecklists();
+                            ElementPlus.ElMessage.success('已保存');
+                        } else {
+                            ElementPlus.ElMessage.error(data.message || '保存检查表失败');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        ElementPlus.ElMessage.error('保存检查表失败，请重试');
+                    } finally {
+                        this.checklistDialog.saving = false;
+                    }
+                },
+                async deleteChecklist(checklist) {
+                    try {
+                        await ElementPlus.ElMessageBox.confirm(
+                            '确定要删除这个检查表吗？',
+                            '确认删除',
+                            { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
+                        );
+                    } catch {
+                        return;
+                    }
+
+                    try {
+                        const data = await MikeChecklistApi.deleteChecklist(checklist.id);
+                        if (!data) return;
+
+                        if (data.success) {
+                            ElementPlus.ElMessage.success('已删除');
+                            await this.loadChecklists();
+                        } else {
+                            ElementPlus.ElMessage.error(data.message || '删除检查表失败');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        ElementPlus.ElMessage.error('删除检查表失败，请重试');
+                    }
+                },
+
+                async openItemsDialog(checklist) {
+                    this.currentChecklistId = String(checklist.id);
+                    this.currentChecklistName = checklist.name || '';
+                    this.itemsDialog.checklistName = checklist.name || '';
+                    this.itemsDialog.visible = true;
+                    await this.loadItems();
+                },
+                async loadItems() {
+                    if (!this.currentChecklistId) return;
+
+                    this.itemsDialog.loading = true;
+                    try {
+                        const data = await MikeChecklistApi.getChecklist(this.currentChecklistId);
+                        if (!data) return;
+
+                        if (data.success) {
+                            const items = (data.checklist && data.checklist.items) ? data.checklist.items : [];
+                            this.items = items.map(it => ({
+                                ...it,
+                                id: String(it.id),
+                                checklist_id: String(it.checklist_id),
+                                order_index: MikeChecklistApi.normalizeOrderIndex(it.order_index),
+                                checked: !!it.checked
+                            }));
+                        } else {
+                            ElementPlus.ElMessage.error(data.message || '加载检查项失败');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        ElementPlus.ElMessage.error('加载检查项失败，请重试');
+                    } finally {
+                        this.itemsDialog.loading = false;
+                    }
+                },
+
+                openItemDialogForCreate() {
+                    if (!this.currentChecklistId) {
+                        ElementPlus.ElMessage.error('缺少检查表 ID');
+                        return;
+                    }
+                    this.itemDialog.title = '添加检查项';
+                    this.itemDialog.form.id = '';
+                    this.itemDialog.form.name = '';
+                    this.itemDialog.visible = true;
+                },
+                openItemDialogForEdit(item) {
+                    this.itemDialog.title = '编辑检查项';
+                    this.itemDialog.form.id = String(item.id);
+                    this.itemDialog.form.name = item.name || '';
+                    this.itemDialog.visible = true;
+                },
+                async saveItem() {
+                    const name = (this.itemDialog.form.name || '').trim();
+                    if (!name) {
+                        ElementPlus.ElMessage.warning('请输入检查项名称');
+                        return;
+                    }
+                    if (!this.currentChecklistId) {
+                        ElementPlus.ElMessage.error('缺少检查表 ID');
+                        return;
+                    }
+
+                    const id = this.itemDialog.form.id;
+                    const existing = id ? this.items.find(it => String(it.id) === String(id)) : null;
+                    const orderIndex = id
+                        ? MikeChecklistApi.normalizeOrderIndex(existing && existing.order_index)
+                        : MikeChecklistApi.nextOrderIndex(this.items);
+                    const checked = id ? !!(existing && existing.checked) : false;
+
+                    this.itemDialog.saving = true;
+                    try {
+                        const data = id
+                            ? await MikeChecklistApi.updateChecklistItem(id, { name, orderIndex, checked })
+                            : await MikeChecklistApi.createChecklistItem({ checklistId: this.currentChecklistId, name, orderIndex });
+                        if (!data) return;
+
+                        if (data.success) {
+                            this.itemDialog.visible = false;
+                            await this.loadItems();
+                            ElementPlus.ElMessage.success('已保存');
+                        } else {
+                            ElementPlus.ElMessage.error(data.message || '保存检查项失败');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        ElementPlus.ElMessage.error('保存检查项失败，请重试');
+                    } finally {
+                        this.itemDialog.saving = false;
+                    }
+                },
+                async deleteItem(item) {
+                    try {
+                        await ElementPlus.ElMessageBox.confirm(
+                            '确定要删除这个检查项吗？',
+                            '确认删除',
+                            { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
+                        );
+                    } catch {
+                        return;
+                    }
+
+                    try {
+                        const data = await MikeChecklistApi.deleteChecklistItem(item.id);
+                        if (!data) return;
+
+                        if (data.success) {
+                            ElementPlus.ElMessage.success('已删除');
+                            await this.loadItems();
+                        } else {
+                            ElementPlus.ElMessage.error(data.message || '删除检查项失败');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        ElementPlus.ElMessage.error('删除检查项失败，请重试');
+                    }
+                },
+
+                // Drag & drop
+                onDragStart(event, type, id) {
+                    this.drag.type = type;
+                    this.drag.id = id;
+                    this.drag.lastOverId = null;
+                    try {
+                        event.dataTransfer.effectAllowed = 'move';
+                        event.dataTransfer.setData('text/plain', id);
+                    } catch {}
+                },
+                onDragOver(type, overId) {
+                    if (this.drag.type !== type) return;
+                    if (!this.drag.id) return;
+                    if (this.drag.id === overId) return;
+                    if (this.drag.lastOverId === overId) return;
+
+                    const list = type === 'checklist' ? this.checklists : this.items;
+                    const fromIndex = list.findIndex(x => String(x.id) === String(this.drag.id));
+                    const toIndex = list.findIndex(x => String(x.id) === String(overId));
+                    if (fromIndex < 0 || toIndex < 0) return;
+
+                    const [moved] = list.splice(fromIndex, 1);
+                    list.splice(toIndex, 0, moved);
+                    this.drag.lastOverId = overId;
+                },
+                async onDragEnd(type) {
+                    if (this.drag.type !== type) {
+                        this.drag.type = null;
+                        this.drag.id = null;
+                        this.drag.lastOverId = null;
+                        return;
+                    }
+
+                    this.drag.type = null;
+                    this.drag.id = null;
+                    this.drag.lastOverId = null;
+                    await this.persistOrder(type);
+                },
+                async persistOrder(type) {
+                    const list = type === 'checklist' ? this.checklists : this.items;
+                    const updates = [];
+                    for (let i = 0; i < list.length; i++) {
+                        const row = list[i];
+                        const currentOrder = Number(row.order_index);
+                        const newOrder = i;
+                        if (currentOrder !== newOrder) {
+                            updates.push({ id: String(row.id), order: newOrder });
+                            row.order_index = newOrder;
+                        }
+                    }
+
+                    if (!updates.length) return;
+
+                    try {
+                        for (const update of updates) {
+                            if (type === 'checklist') {
+                                const current = this.checklists.find(c => String(c.id) === String(update.id));
+                                await MikeChecklistApi.updateChecklist(update.id, {
+                                    name: current ? (current.name || '') : '',
+                                    orderIndex: update.order
+                                });
+                            } else {
+                                const currentItem = this.items.find(i => String(i.id) === String(update.id));
+                                if (!currentItem) continue;
+                                await MikeChecklistApi.updateChecklistItem(update.id, {
+                                    name: currentItem.name,
+                                    orderIndex: update.order,
+                                    checked: currentItem.checked
+                                });
+                            }
+                        }
+                    } catch (err) {
+                        console.error(err);
+                    }
+                }
+            },
+            mounted() {
+                this.loadChecklists();
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>

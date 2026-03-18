@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>前往柯士甸</title>
+    <link href="/vendor/element-plus/index.css" rel="stylesheet">
+    <link href="/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 0; background: #f5f7fa; }
+        #app { min-height: 100vh; padding: 20px; }
+        .page-container { max-width: 720px; margin: 0 auto; }
+        .page-header {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px 18px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .page-title { font-size: 20px; font-weight: 700; color: #303133; }
+        .meta { color: #909399; font-size: 13px; }
+        .big-minutes { font-size: 56px; font-weight: 800; line-height: 1; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="page-container">
+            <div class="page-header">
+                <el-button circle @click="goBack" aria-label="返回">
+                    <i class="bi bi-arrow-left"></i>
+                </el-button>
+                <div class="page-title">前往柯士甸</div>
+                <div style="margin-left:auto; display:flex; gap: 8px;">
+                    <el-button type="primary" plain @click="load" :loading="loading">
+                        <i class="bi bi-arrow-repeat"></i>
+                        刷新
+                    </el-button>
+                </div>
+            </div>
+
+            <el-card shadow="hover" style="border-radius: 12px;">
+                <template v-if="error">
+                    <el-alert :title="error" type="error" show-icon />
+                </template>
+                <template v-if="!error">
+                    <div style="display:flex; align-items: baseline; justify-content: center; gap: 10px; padding: 18px 0;">
+                        <div class="big-minutes">{{ minutes }}</div>
+                        <div style="font-size: 18px; font-weight: 600; color: #303133;">分钟</div>
+                    </div>
+                    <div style="text-align:center; margin-top: 4px; color: #606266;">
+                        {{ departTime }} - {{ arriveTime }}
+                    </div>
+                </template>
+
+                <div style="margin-top: 14px; text-align:center;" class="meta">
+                    下次自动刷新：{{ nextRefresh }}
+                </div>
+            </el-card>
+        </div>
+    </div>
+
+    <script src="/vendor/vue/vue.global.prod.js"></script>
+    <script src="/vendor/element-plus/index.full.js"></script>
+    <script>
+        const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+        const { ElMessage } = ElementPlus;
+
+        createApp({
+            setup() {
+                const loading = ref(true);
+                const error = ref('');
+                const minutes = ref('--');
+                const departTime = ref('--:--:--');
+                const arriveTime = ref('--:--:--');
+                const nextRefreshSeconds = ref(5);
+
+                let refreshTimer = null;
+                let countdownTimer = null;
+                let lastTickAt = Date.now();
+
+                const formatTime = (dateTimeString) => {
+                    const d = new Date(dateTimeString);
+                    if (Number.isNaN(d.getTime())) return '--:--:--';
+                    const hh = String(d.getHours()).padStart(2, '0');
+                    const mm = String(d.getMinutes()).padStart(2, '0');
+                    const ss = String(d.getSeconds()).padStart(2, '0');
+                    return `${hh}:${mm}:${ss}`;
+                };
+
+                const load = async () => {
+                    loading.value = true;
+                    error.value = '';
+                    try {
+                        const res = await fetch('/mtr/next-train-to-aus', { cache: 'no-store' });
+                        const data = await res.json();
+                        if (data.status !== 'success') throw new Error(data.message || '获取失败');
+                        minutes.value = String(Math.round(Number(data.data.timeUntilDeparture || 0) / 60));
+                        departTime.value = formatTime(data.data.departHungHom);
+                        arriveTime.value = formatTime(data.data.actualArrivalAtAustin);
+                    } catch (e) {
+                        console.error(e);
+                        error.value = e?.message || '获取失败';
+                        ElMessage.error(error.value);
+                    } finally {
+                        loading.value = false;
+                        nextRefreshSeconds.value = 5;
+                        lastTickAt = Date.now();
+                    }
+                };
+
+                const nextRefresh = computed(() => {
+                    const s = Math.max(0, Number(nextRefreshSeconds.value || 0));
+                    const mm = String(Math.floor(s / 60)).padStart(2, '0');
+                    const ss = String(s % 60).padStart(2, '0');
+                    return `${mm}:${ss}`;
+                });
+
+                const goBack = () => {
+                    window.location.href = '/dash.html';
+                };
+
+                onMounted(async () => {
+                    await load();
+                    refreshTimer = setInterval(load, 5000);
+                    countdownTimer = setInterval(() => {
+                        const now = Date.now();
+                        const elapsed = Math.floor((now - lastTickAt) / 1000);
+                        const left = 5 - (elapsed % 5);
+                        nextRefreshSeconds.value = left;
+                    }, 250);
+                });
+
+                onUnmounted(() => {
+                    if (refreshTimer) clearInterval(refreshTimer);
+                    if (countdownTimer) clearInterval(countdownTimer);
+                });
+
+                return { loading, error, minutes, departTime, arriveTime, nextRefresh, load, goBack };
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>

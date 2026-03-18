@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>续费管理</title>
+    <link href="/vendor/element-plus/index.css" rel="stylesheet">
+    <link href="/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 0; background: #f5f7fa; }
+        #app { min-height: 100vh; padding: 20px; }
+        .page-container { max-width: 980px; margin: 0 auto; }
+        .page-header {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px 18px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .page-title { font-size: 20px; font-weight: 700; color: #303133; }
+        .muted { color: #909399; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="page-container">
+            <div class="page-header">
+                <el-button circle @click="goBack" aria-label="返回">
+                    <i class="bi bi-arrow-left"></i>
+                </el-button>
+                <div class="page-title">续费管理</div>
+                <div style="margin-left:auto; display:flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end;">
+                    <el-select v-model="filterCategoryId" style="width: 200px;" clearable placeholder="按分类筛选">
+                        <el-option label="全部分类" value="" />
+                        <el-option v-for="c in categories" :key="c.id" :label="c.name" :value="String(c.id)" />
+                    </el-select>
+                    <el-button plain @click="goCategory" title="管理续费分类">
+                        <i class="bi bi-tags"></i>
+                        续费分类
+                    </el-button>
+                    <el-button type="primary" @click="goCreate">
+                        <i class="bi bi-plus-lg"></i>
+                        新建续费
+                    </el-button>
+                    <el-button plain @click="load" :loading="loading">
+                        <i class="bi bi-arrow-repeat"></i>
+                        刷新
+                    </el-button>
+                </div>
+            </div>
+
+            <el-card shadow="hover" style="border-radius: 12px;">
+                <el-table v-loading="loading" :data="filteredRenewals" style="width: 100%" empty-text="暂无续费项目">
+                    <el-table-column prop="name" label="名称" min-width="160"></el-table-column>
+                    <el-table-column label="分类" width="160">
+                        <template #default="{ row }">
+                            <el-tag
+                                v-if="categoryMap[String(row.category_id)]"
+                                size="small"
+                                effect="dark"
+                                :style="{ backgroundColor: categoryMap[String(row.category_id)].color || '#409EFF', borderColor: categoryMap[String(row.category_id)].color || '#409EFF' }"
+                            >
+                                {{ categoryMap[String(row.category_id)].name }}
+                            </el-tag>
+                            <span v-else class="muted">未分类</span>
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="描述" min-width="240">
+                        <template #default="{ row }">
+                            <span class="muted">{{ row.description || '无描述' }}</span>
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="expiry_date" label="到期日期" width="140">
+                        <template #default="{ row }">
+                            {{ (row.expiry_date || '').split('T')[0] || '--' }}
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="reminder_days" label="提醒(天)" width="110"></el-table-column>
+                    <el-table-column label="操作" width="180" fixed="right">
+                        <template #default="{ row }">
+                            <el-button size="small" @click.stop="openEdit(row)">编辑</el-button>
+                            <el-button size="small" type="danger" @click.stop="remove(row)">删除</el-button>
+                        </template>
+                    </el-table-column>
+                </el-table>
+            </el-card>
+
+            <el-dialog v-model="editVisible" title="编辑续费项目" width="520px">
+                <el-form ref="formRef" :model="edit" :rules="rules" label-width="90px">
+                    <el-form-item label="名称" prop="name">
+                        <el-input v-model="edit.name" clearable></el-input>
+                    </el-form-item>
+                    <el-form-item label="描述">
+                        <el-input v-model="edit.description" type="textarea" :rows="3"></el-input>
+                    </el-form-item>
+                    <el-form-item label="分类" prop="categoryId">
+                        <el-select v-model="edit.categoryId" style="width: 100%;" filterable>
+                            <el-option v-for="c in categories" :key="c.id" :label="c.name" :value="String(c.id)"></el-option>
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item label="到期日期" prop="expiryDate">
+                        <el-date-picker
+                            v-model="edit.expiryDate"
+                            type="date"
+                            style="width: 100%;"
+                            format="YYYY-MM-DD"
+                            value-format="YYYY-MM-DD"
+                        ></el-date-picker>
+                    </el-form-item>
+                    <el-form-item label="提醒天数" prop="reminderDays">
+                        <el-input-number v-model="edit.reminderDays" :min="0" :max="3650"></el-input-number>
+                    </el-form-item>
+                </el-form>
+                <template #footer>
+                    <el-button @click="editVisible=false">取消</el-button>
+                    <el-button type="primary" :loading="saving" @click="save">保存</el-button>
+                </template>
+            </el-dialog>
+        </div>
+    </div>
+
+    <script src="/vendor/vue/vue.global.prod.js"></script>
+    <script src="/vendor/element-plus/index.full.js"></script>
+    <script>
+        const { createApp, ref, reactive, onMounted, computed } = Vue;
+        const { ElMessage, ElMessageBox } = ElementPlus;
+
+        createApp({
+            setup() {
+                const loading = ref(true);
+                const saving = ref(false);
+                const renewals = ref([]);
+                const categories = ref([]);
+                const filterCategoryId = ref('');
+
+                const categoryMap = computed(() => {
+                    const map = {};
+                    const list = Array.isArray(categories.value) ? categories.value : [];
+                    for (const c of list) {
+                        if (!c) continue;
+                        map[String(c.id)] = c;
+                    }
+                    return map;
+                });
+
+                const filteredRenewals = computed(() => {
+                    const list = Array.isArray(renewals.value) ? renewals.value : [];
+                    const selected = String(filterCategoryId.value || '').trim();
+                    if (!selected) return list;
+                    return list.filter(r => String(r.category_id) === selected);
+                });
+
+                const editVisible = ref(false);
+                const formRef = ref(null);
+                const edit = reactive({
+                    id: null,
+                    name: '',
+                    description: '',
+                    categoryId: '',
+                    expiryDate: '',
+                    reminderDays: 0
+                });
+
+                const rules = {
+                    name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
+                    categoryId: [{ required: true, message: '请选择分类', trigger: 'change' }],
+                    expiryDate: [{ required: true, message: '请选择到期日期', trigger: 'change' }],
+                    reminderDays: [{ required: true, message: '请输入提醒天数', trigger: 'change' }]
+                };
+
+                const getSession = () => {
+                    const cookies = document.cookie.split(';');
+                    for (const cookie of cookies) {
+                        const [name, value] = cookie.trim().split('=');
+                        if (name === 'session') return decodeURIComponent(value);
+                    }
+                    return null;
+                };
+
+                const ensureAuth = () => {
+                    const session = getSession();
+                    if (!session) {
+                        window.location.href = '/login.html';
+                        return null;
+                    }
+                    return session;
+                };
+
+                const loadCategories = async () => {
+                    const session = ensureAuth();
+                    if (!session) return;
+                    try {
+                        const res = await fetch('/api/getAllRenewalCategories', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ session })
+                        });
+                        if (res.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await res.json();
+                        if (!data.success) throw new Error(data.message || '加载分类失败');
+                        categories.value = Array.isArray(data.data) ? data.data : [];
+                    } catch (e) {
+                        console.error(e);
+                        ElMessage.error(e?.message || '加载分类失败');
+                    }
+                };
+
+                const load = async () => {
+                    const session = ensureAuth();
+                    if (!session) return;
+
+                    loading.value = true;
+                    try {
+                        const res = await fetch('/api/getAllRenewals', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ session })
+                        });
+                        if (res.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await res.json();
+                        if (!data.success) throw new Error(data.message || '加载续费项目失败');
+                        renewals.value = Array.isArray(data.data) ? data.data : [];
+                    } catch (e) {
+                        console.error(e);
+                        ElMessage.error(e?.message || '加载续费项目失败');
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                const openEdit = async (row) => {
+                    edit.id = row.id;
+                    edit.name = row.name || '';
+                    edit.description = row.description || '';
+                    edit.categoryId = row.category_id != null ? String(row.category_id) : '';
+                    edit.expiryDate = (row.expiry_date || '').split('T')[0] || '';
+                    edit.reminderDays = Number(row.reminder_days || 0);
+                    await loadCategories();
+                    editVisible.value = true;
+                };
+
+                const save = async () => {
+                    if (!formRef.value) return;
+                    await formRef.value.validate(async (valid) => {
+                        if (!valid) return;
+                        const session = ensureAuth();
+                        if (!session) return;
+
+                        saving.value = true;
+                        try {
+                            const res = await fetch(`/api/updateRenewals/${edit.id}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    name: edit.name,
+                                    description: edit.description,
+                                    categoryId: edit.categoryId,
+                                    expiryDate: edit.expiryDate,
+                                    reminderDays: String(edit.reminderDays),
+                                    session
+                                })
+                            });
+                            if (res.status === 401) {
+                                window.location.href = '/login.html';
+                                return;
+                            }
+                            const data = await res.json();
+                            if (!data.success) throw new Error(data.message || '更新失败');
+                            ElMessage.success('续费项目已更新');
+                            editVisible.value = false;
+                            await load();
+                        } catch (e) {
+                            console.error(e);
+                            ElMessage.error(e?.message || '更新失败');
+                        } finally {
+                            saving.value = false;
+                        }
+                    });
+                };
+
+                const remove = async (row) => {
+                    const session = ensureAuth();
+                    if (!session) return;
+                    try {
+                        await ElMessageBox.confirm('确定要删除该续费项目吗？此操作不可撤销！', '确认删除', {
+                            type: 'warning',
+                            confirmButtonText: '删除',
+                            cancelButtonText: '取消'
+                        });
+                    } catch {
+                        return;
+                    }
+
+                    try {
+                        const res = await fetch(`/api/deleteRenewals/${row.id}`, {
+                            method: 'DELETE',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ session })
+                        });
+                        if (res.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await res.json();
+                        if (!data.success) throw new Error(data.message || '删除失败');
+                        ElMessage.success('续费项目已删除');
+                        await load();
+                    } catch (e) {
+                        console.error(e);
+                        ElMessage.error(e?.message || '删除失败');
+                    }
+                };
+
+                const goBack = () => {
+                    window.location.href = '/dash.html';
+                };
+
+                const goCategory = () => {
+                    window.location.href = '/view/renewal_category.html';
+                };
+
+                const goCreate = () => {
+                    window.location.href = '/create/renewal.html';
+                };
+
+                onMounted(async () => {
+                    ensureAuth();
+                    await loadCategories();
+                    await load();
+                });
+
+                return {
+                    loading,
+                    saving,
+                    renewals,
+                    categories,
+                    filterCategoryId,
+                    categoryMap,
+                    filteredRenewals,
+                    editVisible,
+                    formRef,
+                    edit,
+                    rules,
+                    load,
+                    openEdit,
+                    save,
+                    remove,
+                    goBack,
+                    goCategory,
+                    goCreate
+                };
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>

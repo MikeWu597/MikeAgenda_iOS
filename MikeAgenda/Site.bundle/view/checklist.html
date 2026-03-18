@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>检查表详情</title>
+    <link href="/vendor/element-plus/index.css" rel="stylesheet">
+    <link href="/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 0; background: #f5f7fa; }
+        #app { min-height: 100vh; padding: 20px; }
+        .page-container { max-width: 980px; margin: 0 auto; }
+        .page-header {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px 18px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .page-title { font-size: 20px; font-weight: 700; color: #303133; }
+        .muted { color: #909399; }
+        .item-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .item-name.checked {
+            text-decoration: line-through;
+            color: #909399;
+        }
+        .item-card.checked {
+            background: #ecf5ff;
+        }
+        .completion-checkmark {
+            font-size: 72px;
+            color: #409eff;
+            text-align: center;
+            padding: 28px 0 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="page-container">
+            <div class="page-header">
+                <el-button circle @click="goBack" aria-label="返回">
+                    <i class="bi bi-arrow-left"></i>
+                </el-button>
+                <div class="page-title">{{ checklistName || '检查表' }}</div>
+                <div style="margin-left:auto; display:flex; gap: 8px;">
+                    <el-button plain @click="reload" :loading="loading">
+                        <i class="bi bi-arrow-repeat"></i>
+                        刷新
+                    </el-button>
+                    <el-button v-if="showClearAll" plain @click="clearAll" :loading="savingAny">
+                        清空所有
+                    </el-button>
+                </div>
+            </div>
+
+            <el-card shadow="hover" style="border-radius: 12px;" v-loading="loading">
+                <template v-if="!loading && allCompleted">
+                    <div class="completion-checkmark">
+                        <i class="bi bi-check-circle-fill"></i>
+                    </div>
+                    <div style="text-align:center; padding-bottom: 18px;">
+                        <el-button type="primary" plain @click="resetChecklist" :loading="savingAny">重新开始检查表</el-button>
+                    </div>
+                </template>
+
+                <el-empty v-if="!loading && !allCompleted && items.length === 0" description="该检查表暂无检查项"></el-empty>
+
+                <div v-if="!loading && !allCompleted && items.length > 0">
+                    <div v-for="it in items" :key="it.id" style="margin-bottom: 10px;">
+                        <el-card class="item-card" :class="{ checked: !!it.checked }" shadow="never" style="border-radius: 12px;">
+                            <div class="item-row">
+                                <div style="display:flex; align-items:center; gap: 12px; min-width: 0;">
+                                    <el-checkbox v-model="it.checked" :disabled="savingIds.has(it.id)" @change="(val) => onToggle(it, val)"></el-checkbox>
+                                    <div class="item-name" :class="{ checked: !!it.checked }" style="font-weight: 600; overflow:hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                        {{ it.name }}
+                                    </div>
+                                </div>
+                                <el-tag v-if="savingIds.has(it.id)" type="info">保存中</el-tag>
+                            </div>
+                        </el-card>
+                    </div>
+                    <div class="muted" style="text-align:center; padding-top: 6px;">勾选全部后将显示完成提示</div>
+                </div>
+            </el-card>
+        </div>
+    </div>
+
+    <script src="/vendor/vue/vue.global.prod.js"></script>
+    <script src="/vendor/element-plus/index.full.js"></script>
+    <script src="/js/checklist_api.js"></script>
+    <script>
+        const { createApp, ref, computed, onMounted } = Vue;
+        const { ElMessage, ElMessageBox } = ElementPlus;
+
+        createApp({
+            setup() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const checklistId = urlParams.get('id');
+
+                const loading = ref(true);
+                const checklistName = ref('');
+                const items = ref([]);
+
+                const savingIds = ref(new Set());
+                const savingAny = computed(() => savingIds.value.size > 0);
+
+                const ensureAuth = () => MikeChecklistApi.ensureSessionOrRedirect();
+
+                const ensureChecklistId = () => {
+                    if (!checklistId) {
+                        ElMessage.error('缺少检查表 ID');
+                        window.location.href = '/view/checklists.html';
+                        return false;
+                    }
+                    return true;
+                };
+
+                const goBack = () => {
+                    window.location.href = '/view/checklists.html';
+                };
+
+                const allCompleted = computed(() => items.value.length > 0 && items.value.every(i => !!i.checked));
+                const hasCheckedItems = computed(() => items.value.some(i => !!i.checked));
+                const showClearAll = computed(() => hasCheckedItems.value && !allCompleted.value);
+
+                const reload = async () => {
+                    if (!ensureChecklistId()) return;
+
+                    loading.value = true;
+                    try {
+                        const data = await MikeChecklistApi.getChecklist(checklistId);
+                        if (!data) return;
+                        if (!data.success) throw new Error(data.message || '加载检查表详情失败');
+                        checklistName.value = data.checklist?.name || '检查表';
+                        items.value = Array.isArray(data.checklist?.items) ? data.checklist.items.map(x => ({ ...x })) : [];
+                    } catch (e) {
+                        console.error(e);
+                        ElMessage.error(e?.message || '加载检查表详情失败');
+                        items.value = [];
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                const updateItemStatus = async (itemId, checked) => {
+                    try {
+                        const data = await MikeChecklistApi.updateChecklistItemStatus(itemId, checked);
+                        if (!data) return { ok: false };
+                        if (!data.success) throw new Error(data.message || '更新检查项状态失败');
+                        return { ok: true };
+                    } catch (e) {
+                        console.error(e);
+                        ElMessage.error(e?.message || '更新检查项状态失败');
+                        return { ok: false };
+                    }
+                };
+
+                const onToggle = async (item, val) => {
+                    const prev = !val;
+                    savingIds.value.add(item.id);
+                    savingIds.value = new Set(savingIds.value);
+                    const { ok } = await updateItemStatus(item.id, !!val);
+                    if (!ok) {
+                        item.checked = prev;
+                    }
+                    savingIds.value.delete(item.id);
+                    savingIds.value = new Set(savingIds.value);
+                };
+
+                const clearAll = async () => {
+                    const checkedItems = items.value.filter(i => !!i.checked);
+                    if (checkedItems.length === 0) return;
+
+                    try {
+                        await ElMessageBox.confirm(`确定要清空 ${checkedItems.length} 个已勾选项吗？`, '确认', {
+                            type: 'warning',
+                            confirmButtonText: '清空',
+                            cancelButtonText: '取消'
+                        });
+                    } catch {
+                        return;
+                    }
+
+                    const updates = checkedItems.map(async (it) => {
+                        const prev = it.checked;
+                        it.checked = false;
+                        savingIds.value.add(it.id);
+                        savingIds.value = new Set(savingIds.value);
+                        const { ok } = await updateItemStatus(it.id, false);
+                        if (!ok) it.checked = prev;
+                        savingIds.value.delete(it.id);
+                        savingIds.value = new Set(savingIds.value);
+                    });
+                    await Promise.all(updates);
+                };
+
+                const resetChecklist = async () => {
+                    if (!ensureChecklistId()) return;
+
+                    try {
+                        await ElMessageBox.confirm('确定要重新开始检查表（取消所有勾选）吗？', '确认', {
+                            type: 'warning',
+                            confirmButtonText: '重置',
+                            cancelButtonText: '取消'
+                        });
+                    } catch {
+                        return;
+                    }
+
+                    // 复用旧实现：先拉取清单，再逐个更新
+                    try {
+                        const data = await MikeChecklistApi.getChecklist(checklistId);
+                        if (!data) return;
+                        if (!data.success) throw new Error(data.message || '重置检查表失败');
+                        const serverItems = Array.isArray(data.checklist?.items) ? data.checklist.items : [];
+
+                        const updates = serverItems.map(async (it) => {
+                            savingIds.value.add(it.id);
+                            savingIds.value = new Set(savingIds.value);
+                            await updateItemStatus(it.id, false);
+                            savingIds.value.delete(it.id);
+                            savingIds.value = new Set(savingIds.value);
+                        });
+                        await Promise.all(updates);
+                        await reload();
+                    } catch (e) {
+                        console.error(e);
+                        ElMessage.error(e?.message || '重置检查表失败');
+                    }
+                };
+
+                onMounted(reload);
+
+                return {
+                    loading,
+                    checklistName,
+                    items,
+                    savingIds,
+                    savingAny,
+                    allCompleted,
+                    showClearAll,
+                    goBack,
+                    reload,
+                    onToggle,
+                    clearAll,
+                    resetChecklist
+                };
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>所有项目</title>
+    <link href="/vendor/element-plus/index.css" rel="stylesheet">
+    <link href="/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 0; background: #f5f7fa; }
+        #app { min-height: 100vh; padding: 20px; }
+        .page-container { max-width: 980px; margin: 0 auto; }
+        .page-header {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px 18px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .page-title { font-size: 20px; font-weight: 700; color: #303133; }
+        .muted { color: #909399; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="page-container">
+            <div class="page-header">
+                <el-button circle @click="goBack" aria-label="返回">
+                    <i class="bi bi-arrow-left"></i>
+                </el-button>
+                <div class="page-title">所有项目</div>
+                <div style="margin-left:auto; display:flex; gap: 8px;">
+                    <el-button type="primary" @click="goCreate">
+                        <i class="bi bi-plus-lg"></i>
+                        新建项目
+                    </el-button>
+                    <el-button plain @click="load" :loading="loading">
+                        <i class="bi bi-arrow-repeat"></i>
+                        刷新
+                    </el-button>
+                </div>
+            </div>
+
+            <el-card shadow="hover" style="border-radius: 12px;">
+                <el-table
+                    v-loading="loading"
+                    :data="projects"
+                    style="width: 100%"
+                    @row-click="openDetail"
+                    empty-text="暂无项目"
+                >
+                    <el-table-column label="" width="46">
+                        <template #default="{ row }">
+                            <div :style="{ width: '18px', height: '18px', borderRadius: '4px', backgroundColor: row.color || '#dcdfe6' }"></div>
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="name" label="名称" min-width="180"></el-table-column>
+                    <el-table-column prop="description" label="描述" min-width="260">
+                        <template #default="{ row }">
+                            <span class="muted">{{ row.description || '无描述' }}</span>
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="id" label="#" width="90"></el-table-column>
+                    <el-table-column label="" width="110">
+                        <template #default>
+                            <span class="muted">点击查看</span>
+                        </template>
+                    </el-table-column>
+                </el-table>
+            </el-card>
+        </div>
+    </div>
+
+    <script src="/vendor/vue/vue.global.prod.js"></script>
+    <script src="/vendor/element-plus/index.full.js"></script>
+    <script>
+        const { createApp, ref, onMounted } = Vue;
+        const { ElMessage } = ElementPlus;
+
+        createApp({
+            setup() {
+                const loading = ref(true);
+                const projects = ref([]);
+
+                const getSession = () => {
+                    const cookies = document.cookie.split(';');
+                    for (const cookie of cookies) {
+                        const [name, value] = cookie.trim().split('=');
+                        if (name === 'session') return decodeURIComponent(value);
+                    }
+                    return null;
+                };
+
+                const ensureAuth = () => {
+                    const session = getSession();
+                    if (!session) {
+                        window.location.href = '/login.html';
+                        return null;
+                    }
+                    return session;
+                };
+
+                const load = async () => {
+                    const session = ensureAuth();
+                    if (!session) return;
+
+                    loading.value = true;
+                    try {
+                        const res = await fetch('/api/getProjects', {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'session': session
+                            }
+                        });
+                        if (res.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await res.json();
+                        if (!data.success) throw new Error(data.message || '加载项目失败');
+                        projects.value = Array.isArray(data.projects) ? data.projects : [];
+                    } catch (e) {
+                        console.error(e);
+                        ElMessage.error(e?.message || '加载项目失败');
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                const openDetail = (row) => {
+                    if (!row?.id) return;
+                    window.location.href = `project_detail.html?id=${row.id}`;
+                };
+
+                const goBack = () => {
+                    window.location.href = '/dash.html';
+                };
+
+                const goCreate = () => {
+                    window.location.href = '/create/project.html';
+                };
+
+                onMounted(load);
+
+                return { loading, projects, load, openDetail, goBack, goCreate };
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>

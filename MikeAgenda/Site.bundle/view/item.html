@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>所有事项</title>
+    <link href="/vendor/element-plus/index.css" rel="stylesheet">
+    <link href="/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #f5f7fa;
+        }
+        #app {
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .page-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .page-header {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .page-header-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+        }
+        .back-button {
+            margin-right: 16px;
+        }
+        .page-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #303133;
+        }
+        .items-container {
+            display: grid;
+            gap: 16px;
+        }
+        .item-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .item-card:hover {
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            transform: translateY(-2px);
+        }
+        .item-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        .item-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #303133;
+            flex: 1;
+        }
+        .item-title-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
+        }
+        .item-description {
+            font-size: 14px;
+            color: #606266;
+            margin-bottom: 12px;
+            line-height: 1.6;
+        }
+        .item-meta {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            font-size: 13px;
+            color: #909399;
+        }
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        @media (max-width: 600px) {
+            #app {
+                padding: 12px;
+            }
+            .page-header {
+                padding: 14px;
+                flex-wrap: wrap;
+                gap: 12px;
+                justify-content: flex-start;
+            }
+            .page-title {
+                font-size: 18px;
+            }
+            .item-card {
+                padding: 14px;
+            }
+            .item-title {
+                font-size: 16px;
+            }
+            .item-title-text {
+                white-space: normal;
+                overflow: visible;
+                text-overflow: clip;
+                overflow-wrap: anywhere;
+                word-break: break-word;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="page-container">
+            <div class="page-header">
+                <div class="header-left">
+                    <el-button class="back-button" circle @click="goBack">
+                        <i class="bi bi-arrow-left"></i>
+                    </el-button>
+                    <h1 class="page-title">所有事项</h1>
+                </div>
+                <div class="page-header-right">
+                    <el-button type="primary" @click="goToPage('/create/item.html')" style="margin-right: 8px;">
+                        <i class="bi bi-plus-lg"></i> 创建事项
+                    </el-button>
+                    <el-button type="success" @click="goToPage('/view/item_done.html')">
+                        <i class="bi bi-check-circle"></i> 已完成
+                    </el-button>
+                </div>
+            </div>
+
+            <div v-if="loading" style="text-align: center; padding: 60px;">
+                <el-icon class="is-loading" :size="40"><Loading /></el-icon>
+                <div style="margin-top: 16px; color: #909399;">加载中...</div>
+            </div>
+
+            <div v-if="!loading && items.length === 0" style="text-align: center; padding: 60px; background: white; border-radius: 12px;">
+                <div style="font-size: 64px; color: #dcdfe6; margin-bottom: 16px;">
+                    <i class="bi bi-inbox"></i>
+                </div>
+                <div style="color: #909399; font-size: 16px;">暂无待办事项</div>
+                <el-button type="primary" style="margin-top: 24px;" @click="goToPage('/create/item.html')">
+                    <i class="bi bi-plus-lg"></i> 创建事项
+                </el-button>
+            </div>
+
+            <div v-if="!loading && items.length > 0" style="display:flex; align-items:center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;">
+                <div style="color:#606266; font-size: 13px;">
+                    共 {{ items.length }} 条
+                </div>
+                <div style="display:flex; align-items:center; gap: 10px; flex-wrap: wrap;">
+                    <div style="display:flex; align-items:center; gap: 6px; color:#606266; font-size: 13px;">
+                        <span>每页</span>
+                        <el-select v-model="pageSize" size="small" style="width: 100px;">
+                            <el-option v-for="n in pageSizeOptions" :key="n" :label="n + ' 条'" :value="n" />
+                        </el-select>
+                    </div>
+                    <el-pagination
+                        background
+                        layout="prev, pager, next"
+                        :total="items.length"
+                        v-model:current-page="currentPage"
+                        v-model:page-size="pageSize"
+                    />
+                    <div style="display:flex; align-items:center; gap: 6px; color:#606266; font-size: 13px;">
+                        <span>跳至</span>
+                        <el-input-number v-model="jumpPage" :min="1" :max="maxPage" size="small" style="width: 120px;" @change="applyJump" />
+                        <span>页</span>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="!loading && items.length > 0" class="items-container">
+                <div v-for="item in pagedItems" :key="item.id" class="item-card">
+                    <div class="item-header">
+                        <div class="item-title" style="display:flex; align-items:center; gap: 8px; min-width: 0;">
+                            <span v-if="item.categoryTags && item.categoryTags.length" style="display:inline-flex; gap: 6px; flex-wrap: wrap;">
+                                <el-tag
+                                    v-for="cat in item.categoryTags"
+                                    :key="String(cat.id)"
+                                    size="small"
+                                    effect="dark"
+                                    :style="{ backgroundColor: cat.color || '#409EFF', borderColor: cat.color || '#409EFF' }"
+                                >
+                                    {{ cat.name }}
+                                </el-tag>
+                            </span>
+                            <span class="item-title-text">
+                                {{ item.title }}
+                            </span>
+                        </div>
+                        <el-dropdown @command="handleCommand">
+                            <el-button text circle>
+                                <i class="bi bi-three-dots-vertical"></i>
+                            </el-button>
+                            <template #dropdown>
+                                <el-dropdown-menu>
+                                    <el-dropdown-item :command="{action: 'edit', item}">
+                                        <i class="bi bi-pencil"></i> 编辑
+                                    </el-dropdown-item>
+                                    <el-dropdown-item :command="{action: 'done', item}">
+                                        <i class="bi bi-check-circle"></i> 标记完成
+                                    </el-dropdown-item>
+                                    <el-dropdown-item :command="{action: 'delete', item}" divided>
+                                        <span style="color: #f56c6c;">
+                                            <i class="bi bi-trash"></i> 删除
+                                        </span>
+                                    </el-dropdown-item>
+                                </el-dropdown-menu>
+                            </template>
+                        </el-dropdown>
+                    </div>
+                    
+                    <div v-if="item.description" class="item-description">
+                        {{ item.description }}
+                    </div>
+                    
+                    <div class="item-meta">
+                        <div v-if="item.deadline" class="meta-item">
+                            <i class="bi bi-calendar-event"></i>
+                            <span>截止: {{ item.deadline }}</span>
+                        </div>
+                        <div v-if="item.planned_time" class="meta-item">
+                            <i class="bi bi-clock"></i>
+                            <span>计划: {{ item.planned_time }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 编辑对话框 -->
+        <el-dialog v-model="editDialogVisible" title="编辑事项" width="600px">
+            <el-form :model="editForm" label-width="100px">
+                <el-form-item label="标题">
+                    <el-input v-model="editForm.title" />
+                </el-form-item>
+                <el-form-item label="描述">
+                    <el-input v-model="editForm.description" type="textarea" :rows="3" />
+                </el-form-item>
+                <el-form-item label="截止日期">
+                    <el-date-picker
+                        v-model="editForm.deadline"
+                        type="date"
+                        format="YYYY-MM-DD"
+                        value-format="YYYY-MM-DD"
+                        style="width: 100%"
+                    />
+                </el-form-item>
+                <el-form-item label="计划时间">
+                    <el-date-picker
+                        v-model="editForm.planned_time"
+                        type="datetime"
+                        format="YYYY-MM-DD HH:mm"
+                        value-format="YYYY-MM-DD HH:mm:ss"
+                        style="width: 100%"
+                    />
+                </el-form-item>
+                <el-form-item label="分类">
+                    <el-checkbox-group v-model="editForm.categoryIds">
+                        <el-checkbox 
+                            v-for="cat in categories" 
+                            :key="cat.id" 
+                            :label="cat.id"
+                            border
+                        >
+                            {{ cat.name }}
+                        </el-checkbox>
+                    </el-checkbox-group>
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <el-button @click="editDialogVisible = false">取消</el-button>
+                <el-button type="primary" @click="saveEdit">保存</el-button>
+            </template>
+        </el-dialog>
+    </div>
+
+    <script src="/vendor/vue/vue.global.prod.js"></script>
+    <script src="/vendor/element-plus/index.full.js"></script>
+    <script src="/vendor/element-plus-icons/icons-vue.iife.min.js"></script>
+    <script>
+        const { createApp, ref, reactive, computed, watch, onMounted } = Vue;
+        const { ElMessage, ElMessageBox } = ElementPlus;
+
+        createApp({
+            setup() {
+                const loading = ref(true);
+                const items = ref([]);
+                const categories = ref([]);
+                const currentPage = ref(1);
+                const pageSize = ref(20);
+                const pageSizeOptions = [10, 20, 50, 100];
+                const jumpPage = ref(1);
+                const editDialogVisible = ref(false);
+                const editForm = reactive({
+                    id: null,
+                    title: '',
+                    description: '',
+                    deadline: '',
+                    planned_time: '',
+                    categoryIds: []
+                });
+
+                const maxPage = computed(() => {
+                    return Math.max(1, Math.ceil(items.value.length / pageSize.value));
+                });
+
+                const pagedItems = computed(() => {
+                    const start = (currentPage.value - 1) * pageSize.value;
+                    return items.value.slice(start, start + pageSize.value);
+                });
+
+                const applyJump = () => {
+                    const raw = Number(jumpPage.value);
+                    const clamped = Math.min(maxPage.value, Math.max(1, Number.isFinite(raw) ? raw : 1));
+                    currentPage.value = clamped;
+                };
+
+                // 获取session
+                const getSession = () => {
+                    const cookies = document.cookie.split(';');
+                    for (const cookie of cookies) {
+                        const [name, value] = cookie.trim().split('=');
+                        if (name === 'session') {
+                            return decodeURIComponent(value);
+                        }
+                    }
+                    return null;
+                };
+
+                const safeJsonParse = (value, fallback) => {
+                    try {
+                        if (!value) return fallback;
+                        if (typeof value !== 'string') return fallback;
+                        return JSON.parse(value);
+                    } catch {
+                        return fallback;
+                    }
+                };
+
+                const normalizePlannedTime = (value) => {
+                    if (!value) return '';
+                    return String(value).replace('T', ' ');
+                };
+
+                // 加载分类
+                const loadCategories = async () => {
+                    const session = getSession();
+                    try {
+                        const response = await fetch('/api/getCategories', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ session })
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            categories.value = data.categories;
+                        }
+                    } catch (error) {
+                        console.error('Error loading categories:', error);
+                    }
+                };
+
+                // 加载事项
+                const loadItems = async () => {
+                    const session = getSession();
+                    if (!session) {
+                        window.location.href = '/login.html';
+                        return;
+                    }
+
+                    loading.value = true;
+                    try {
+                        const response = await fetch('/api/getItems', {
+                            method: 'GET',
+                            headers: { 'session': session }
+                        });
+                        
+                        const data = await response.json();
+                        if (data.success) {
+                            // 后端已过滤：done = 0 AND archived = 0
+                            items.value = Array.isArray(data.items) ? data.items : [];
+                            
+                            // 为每个 item 添加分类（含颜色）
+                            items.value.forEach(item => {
+                                if (item.category) {
+                                    const catIds = safeJsonParse(item.category, []);
+                                    item.categoryTags = catIds.map(id => {
+                                        const cat = categories.value.find(c => String(c.id) === String(id));
+                                        return cat
+                                            ? { id: String(cat.id), name: cat.name, color: cat.color }
+                                            : { id: String(id), name: '未知分类', color: '#909399' };
+                                    });
+                                }
+                            });
+                        } else if (response.status === 401) {
+                            window.location.href = '/login.html';
+                        } else {
+                            ElMessage.error(data.message || '加载失败');
+                        }
+                    } catch (error) {
+                        console.error('Error loading items:', error);
+                        ElMessage.error('加载失败，请重试');
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                // 处理菜单命令
+                const handleCommand = async (command) => {
+                    const { action, item } = command;
+                    
+                    if (action === 'edit') {
+                        editForm.id = item.id;
+                        editForm.title = item.title;
+                        editForm.description = item.description || '';
+                        editForm.deadline = item.deadline;
+                        editForm.planned_time = normalizePlannedTime(item.planned_time || '');
+                        editForm.categoryIds = safeJsonParse(item.category, []);
+                        editDialogVisible.value = true;
+                    } else if (action === 'done') {
+                        await markAsDone(item);
+                    } else if (action === 'delete') {
+                        await deleteItem(item);
+                    }
+                };
+
+                // 保存编辑
+                const saveEdit = async () => {
+                    const session = getSession();
+                    try {
+                        const response = await fetch('/api/updateItem', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                session,
+                                id: editForm.id,
+                                title: editForm.title,
+                                description: editForm.description,
+                                deadline: editForm.deadline,
+                                planned_time: editForm.planned_time,
+                                category: editForm.categoryIds
+                            })
+                        });
+
+                        const data = await response.json();
+                        if (data.success) {
+                            ElMessage.success('更新成功');
+                            editDialogVisible.value = false;
+                            await loadItems();
+                        } else {
+                            ElMessage.error(data.message || '更新失败');
+                        }
+                    } catch (error) {
+                        console.error('Error updating item:', error);
+                        ElMessage.error('更新失败，请重试');
+                    }
+                };
+
+                // 标记完成
+                const markAsDone = async (item) => {
+                    try {
+                        await ElMessageBox.confirm('确定要标记此事项为已完成吗？', '提示', {
+                            confirmButtonText: '确定',
+                            cancelButtonText: '取消',
+                            type: 'success'
+                        });
+
+                        const session = getSession();
+                        const response = await fetch('/api/markItemAsDone', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ session, id: item.id })
+                        });
+
+                        const data = await response.json();
+                        if (data.success) {
+                            ElMessage.success('已标记为完成');
+                            await loadItems();
+                        } else {
+                            ElMessage.error(data.message || '操作失败');
+                        }
+                    } catch (error) {
+                        if (error !== 'cancel') {
+                            console.error('Error marking done:', error);
+                            ElMessage.error('操作失败，请重试');
+                        }
+                    }
+                };
+
+                // 删除事项
+                const deleteItem = async (item) => {
+                    try {
+                        await ElMessageBox.confirm('确定要删除此事项吗？此操作无法撤销。', '警告', {
+                            confirmButtonText: '确定删除',
+                            cancelButtonText: '取消',
+                            type: 'warning'
+                        });
+
+                        const session = getSession();
+                        const response = await fetch('/api/deleteItem', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ session, id: item.id })
+                        });
+
+                        const data = await response.json();
+                        if (data.success) {
+                            ElMessage.success('删除成功');
+                            await loadItems();
+                        } else {
+                            ElMessage.error(data.message || '删除失败');
+                        }
+                    } catch (error) {
+                        if (error !== 'cancel') {
+                            console.error('Error deleting item:', error);
+                            ElMessage.error('删除失败，请重试');
+                        }
+                    }
+                };
+
+                // 页面跳转
+                const goBack = () => {
+                    window.location.href = '/dash.html';
+                };
+
+                const goToPage = (url) => {
+                    window.location.href = url;
+                };
+
+                // 初始化
+                onMounted(async () => {
+                    await loadCategories();
+                    await loadItems();
+                });
+
+                watch(
+                    () => [items.value.length, pageSize.value],
+                    () => {
+                        const total = items.value.length;
+                        const maxPage = Math.max(1, Math.ceil(total / pageSize.value));
+                        if (currentPage.value > maxPage) currentPage.value = maxPage;
+                        if (currentPage.value < 1) currentPage.value = 1;
+                        jumpPage.value = currentPage.value;
+                    }
+                );
+
+                watch(
+                    () => currentPage.value,
+                    () => {
+                        jumpPage.value = currentPage.value;
+                    }
+                );
+
+                watch(
+                    () => pageSize.value,
+                    () => {
+                        currentPage.value = 1;
+                    }
+                );
+
+                return {
+                    loading,
+                    items,
+                    pagedItems,
+                    currentPage,
+                    pageSize,
+                    pageSizeOptions,
+                    jumpPage,
+                    maxPage,
+                    applyJump,
+                    categories,
+                    editDialogVisible,
+                    editForm,
+                    handleCommand,
+                    saveEdit,
+                    goBack,
+                    goToPage,
+                    Loading: ElementPlusIconsVue.Loading
+                };
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>

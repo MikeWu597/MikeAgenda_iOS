@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新建续费</title>
+    <link href="/vendor/element-plus/index.css" rel="stylesheet">
+    <link href="/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 0; background: #f5f7fa; }
+        #app { min-height: 100vh; padding: 20px; }
+        .page-container { max-width: 760px; margin: 0 auto; }
+        .page-header {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px 18px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .page-title { font-size: 20px; font-weight: 700; color: #303133; }
+        .hint { color: #909399; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="page-container">
+            <div class="page-header">
+                <el-button circle @click="goBack" aria-label="返回">
+                    <i class="bi bi-arrow-left"></i>
+                </el-button>
+                <div class="page-title">新建续费</div>
+            </div>
+
+            <el-card shadow="hover" style="border-radius: 12px;">
+                <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
+                    <el-form-item label="标题" prop="name">
+                        <el-input v-model="form.name" placeholder="请输入标题" clearable />
+                    </el-form-item>
+                    <el-form-item label="描述" prop="description">
+                        <el-input v-model="form.description" type="textarea" :rows="3" placeholder="请输入描述" />
+                    </el-form-item>
+                    <el-form-item label="分类" prop="categoryId">
+                        <el-select v-model="form.categoryId" placeholder="请选择分类" style="width: 100%;" filterable>
+                            <el-option v-for="c in categories" :key="c.id" :label="c.name" :value="String(c.id)" />
+                        </el-select>
+                        <div class="hint" style="margin-top: 6px; display:flex; gap: 10px; align-items:center; flex-wrap: wrap;">
+                            <span>如果没有分类，请先创建。</span>
+                            <el-button link type="primary" @click="goCreateCategory">新建分类</el-button>
+                            <el-button link type="primary" @click="goManageCategory">管理分类</el-button>
+                        </div>
+                    </el-form-item>
+                    <el-form-item label="下次续费" prop="expiryDate">
+                        <el-date-picker
+                            v-model="form.expiryDate"
+                            type="date"
+                            placeholder="选择日期"
+                            style="width: 100%;"
+                            format="YYYY-MM-DD"
+                            value-format="YYYY-MM-DD"
+                        />
+                    </el-form-item>
+                    <el-form-item label="提醒提前(天)" prop="reminderDays">
+                        <el-input-number v-model="form.reminderDays" :min="1" :max="3650" />
+                    </el-form-item>
+
+                    <el-form-item>
+                        <el-button type="primary" :loading="loading" @click="submit">创建</el-button>
+                        <el-button @click="goBack">取消</el-button>
+                    </el-form-item>
+                </el-form>
+            </el-card>
+        </div>
+    </div>
+
+    <script src="/vendor/vue/vue.global.prod.js"></script>
+    <script src="/vendor/element-plus/index.full.js"></script>
+    <script>
+        const { createApp, ref, reactive, onMounted } = Vue;
+        const { ElMessage } = ElementPlus;
+
+        createApp({
+            setup() {
+                const formRef = ref(null);
+                const loading = ref(false);
+                const categories = ref([]);
+
+                const form = reactive({
+                    name: '',
+                    description: '',
+                    categoryId: '',
+                    expiryDate: '',
+                    reminderDays: 7
+                });
+
+                const rules = {
+                    name: [{ required: true, message: '请输入标题', trigger: 'blur' }],
+                    description: [{ required: true, message: '请输入描述', trigger: 'blur' }],
+                    categoryId: [{ required: true, message: '请选择分类', trigger: 'change' }],
+                    expiryDate: [{ required: true, message: '请选择下次续费日期', trigger: 'change' }],
+                    reminderDays: [{ required: true, message: '请输入提醒天数', trigger: 'change' }]
+                };
+
+                const getSession = () => {
+                    const cookies = document.cookie.split(';');
+                    for (const cookie of cookies) {
+                        const [name, value] = cookie.trim().split('=');
+                        if (name === 'session') return decodeURIComponent(value);
+                    }
+                    return null;
+                };
+
+                const ensureAuth = () => {
+                    const session = getSession();
+                    if (!session) {
+                        window.location.href = '/login.html';
+                        return null;
+                    }
+                    return session;
+                };
+
+                const loadCategories = async () => {
+                    const session = ensureAuth();
+                    if (!session) return;
+                    try {
+                        const res = await fetch('/api/getAllRenewalCategories', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ session })
+                        });
+                        if (res.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await res.json();
+                        if (!data.success) throw new Error(data.message || '加载分类失败');
+                        categories.value = Array.isArray(data.data) ? data.data : [];
+                    } catch (e) {
+                        console.error(e);
+                        ElMessage.error(e?.message || '加载分类失败');
+                    }
+                };
+
+                const submit = async () => {
+                    if (!formRef.value) return;
+                    await formRef.value.validate(async (valid) => {
+                        if (!valid) return;
+                        const session = ensureAuth();
+                        if (!session) return;
+
+                        loading.value = true;
+                        try {
+                            const res = await fetch('/api/createRenewals', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    name: form.name.trim(),
+                                    description: form.description.trim(),
+                                    categoryId: form.categoryId,
+                                    expiryDate: form.expiryDate,
+                                    reminderDays: String(form.reminderDays),
+                                    session
+                                })
+                            });
+                            if (res.status === 401) {
+                                window.location.href = '/login.html';
+                                return;
+                            }
+                            const data = await res.json();
+                            if (!data.success) throw new Error(data.message || '创建失败');
+                            ElMessage.success('续费已创建');
+                            setTimeout(() => (window.location.href = '/view/renewal.html'), 300);
+                        } catch (e) {
+                            console.error(e);
+                            ElMessage.error(e?.message || '创建失败');
+                        } finally {
+                            loading.value = false;
+                        }
+                    });
+                };
+
+                const goBack = () => {
+                    window.location.href = '/dash.html';
+                };
+
+                const goCreateCategory = () => {
+                    window.location.href = '/create/renewal_category.html';
+                };
+
+                const goManageCategory = () => {
+                    window.location.href = '/view/renewal_category.html';
+                };
+
+                onMounted(loadCategories);
+
+                return { formRef, form, rules, loading, categories, submit, goBack, goCreateCategory, goManageCategory };
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>

@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设置</title>
+    <link href="/vendor/element-plus/index.css" rel="stylesheet">
+    <link href="/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { margin: 0; background: #f5f7fa; }
+        #app { max-width: 860px; margin: 0 auto; padding: 18px; }
+        .page-title { display:flex; align-items:center; gap:10px; font-size:20px; font-weight:700; margin:0; }
+        .muted { color: #909399; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <el-card shadow="never">
+            <template #header>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap: 12px;">
+                    <div class="page-title">
+                        <el-button circle @click="goBack" title="返回">
+                            <i class="bi bi-arrow-left"></i>
+                        </el-button>
+                        <span>设置</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap: 8px;">
+                        <el-button :loading="loading" @click="reload">
+                            <i class="bi bi-arrow-clockwise"></i>
+                            <span style="margin-left: 6px;">刷新</span>
+                        </el-button>
+                    </div>
+                </div>
+            </template>
+
+            <div v-loading="loading">
+                <el-form label-width="140px" style="max-width: 680px;">
+                    <el-divider content-position="left">客户端</el-divider>
+
+                    <el-form-item label="刷新间隔（秒）">
+                        <el-input-number v-model="form.refreshInterval" :min="1" :step="1" />
+                        <div class="muted" style="margin-left: 10px;">写入 cookie：refreshInterval</div>
+                    </el-form-item>
+                    <el-form-item>
+                        <el-button type="primary" @click="saveRefreshInterval">
+                            <i class="bi bi-save"></i>
+                            <span style="margin-left: 6px;">保存刷新间隔</span>
+                        </el-button>
+                    </el-form-item>
+
+                    <el-divider content-position="left">授课模式</el-divider>
+
+                    <el-form-item label="授课模式">
+                        <el-switch v-model="form.isTeaching" active-text="启用" inactive-text="关闭" />
+                    </el-form-item>
+                    <el-form-item>
+                        <el-button type="primary" :loading="savingTeaching" @click="saveTeaching">
+                            <i class="bi bi-save"></i>
+                            <span style="margin-left: 6px;">保存授课模式</span>
+                        </el-button>
+                    </el-form-item>
+
+                    <el-divider content-position="left">图片</el-divider>
+
+                    <el-form-item label="图片存储限制（MB）">
+                        <el-input-number v-model="form.imageLimit" :min="1" :step="1" />
+                    </el-form-item>
+                    <el-form-item>
+                        <el-button type="primary" :loading="savingImage" @click="saveImageLimit">
+                            <i class="bi bi-save"></i>
+                            <span style="margin-left: 6px;">保存图片限制</span>
+                        </el-button>
+                    </el-form-item>
+                </el-form>
+            </div>
+        </el-card>
+    </div>
+
+    <script src="/vendor/vue/vue.global.prod.js"></script>
+    <script src="/vendor/element-plus/index.full.js"></script>
+    <script>
+        const { createApp } = Vue;
+
+        const getSessionFromCookie = () => {
+            const cookies = document.cookie.split('; ');
+            for (const cookie of cookies) {
+                const [name, value] = cookie.split('=');
+                if (name === 'session') {
+                    return decodeURIComponent(value);
+                }
+            }
+            return null;
+        };
+
+        const getCookie = (name) => {
+            const cookies = document.cookie.split('; ');
+            for (const cookie of cookies) {
+                const [cookieName, cookieValue] = cookie.split('=');
+                if (cookieName === name) {
+                    return decodeURIComponent(cookieValue);
+                }
+            }
+            return null;
+        };
+
+        const setCookie = (name, value, days = 365) => {
+            const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString();
+            document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/`;
+        };
+
+        createApp({
+            data() {
+                return {
+                    loading: false,
+                    savingTeaching: false,
+                    savingImage: false,
+                    form: {
+                        refreshInterval: null,
+                        isTeaching: false,
+                        imageLimit: null
+                    }
+                };
+            },
+            methods: {
+                goBack() {
+                    window.location.href = 'dash.html';
+                },
+                requireSessionOrRedirect() {
+                    const session = getSessionFromCookie();
+                    if (!session) {
+                        ElementPlus.ElMessage.error('未授权，请重新登录');
+                        window.location.href = '/login.html';
+                        return null;
+                    }
+                    return session;
+                },
+                loadRefreshIntervalFromCookie() {
+                    const raw = getCookie('refreshInterval');
+                    const n = raw ? parseInt(raw, 10) : NaN;
+                    this.form.refreshInterval = Number.isFinite(n) && n > 0 ? n : null;
+                },
+                saveRefreshInterval() {
+                    const value = this.form.refreshInterval;
+                    if (!value || value <= 0) {
+                        ElementPlus.ElMessage.warning('请输入有效的刷新间隔');
+                        return;
+                    }
+                    setCookie('refreshInterval', String(value));
+                    ElementPlus.ElMessage.success('刷新间隔已保存');
+                },
+                async fetchTeachingMode() {
+                    const session = this.requireSessionOrRedirect();
+                    if (!session) return;
+
+                    const resp = await fetch('/api/getTeachingStatus', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'session': session
+                        }
+                    });
+
+                    if (resp.status === 401) {
+                        ElementPlus.ElMessage.error('未授权，请重新登录');
+                        window.location.href = '/login.html';
+                        return;
+                    }
+
+                    const data = await resp.json();
+                    if (data.success) {
+                        // 后端返回 teaching: '0' | '1'
+                        this.form.isTeaching = String(data.teaching) === '1';
+                    } else {
+                        ElementPlus.ElMessage.error(data.message || '加载授课模式失败');
+                    }
+                },
+                async saveTeaching() {
+                    const session = this.requireSessionOrRedirect();
+                    if (!session) return;
+
+                    this.savingTeaching = true;
+                    try {
+                        const teaching = this.form.isTeaching ? '1' : '0';
+                        const resp = await fetch('/api/setTeachingStatus', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'session': session
+                            },
+                            body: JSON.stringify({ session, teaching })
+                        });
+
+                        if (resp.status === 401) {
+                            ElementPlus.ElMessage.error('未授权，请重新登录');
+                            window.location.href = '/login.html';
+                            return;
+                        }
+
+                        const data = await resp.json();
+                        if (data.success) {
+                            ElementPlus.ElMessage.success('授课模式已保存');
+                        } else {
+                            ElementPlus.ElMessage.error(data.message || '保存失败');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        ElementPlus.ElMessage.error('保存失败，请重试');
+                    } finally {
+                        this.savingTeaching = false;
+                    }
+                },
+                async fetchImageLimit() {
+                    const session = this.requireSessionOrRedirect();
+                    if (!session) return;
+
+                    const resp = await fetch('/api/getImageStorageLimit', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'session': session
+                        }
+                    });
+
+                    if (resp.status === 401) {
+                        ElementPlus.ElMessage.error('未授权，请重新登录');
+                        window.location.href = '/login.html';
+                        return;
+                    }
+
+                    const data = await resp.json();
+                    if (data.success) {
+                        // 后端返回 limit（字节），页面展示/输入用 MB
+                        const bytes = data.limit != null ? parseInt(data.limit, 10) : NaN;
+                        const mb = Number.isFinite(bytes) && bytes > 0 ? Math.floor(bytes / (1024 * 1024)) : NaN;
+                        this.form.imageLimit = Number.isFinite(mb) && mb > 0 ? mb : null;
+                    } else {
+                        ElementPlus.ElMessage.error(data.message || '加载图片限制失败');
+                    }
+                },
+                async saveImageLimit() {
+                    const session = this.requireSessionOrRedirect();
+                    if (!session) return;
+
+                    const value = this.form.imageLimit;
+                    if (!value || value <= 0) {
+                        ElementPlus.ElMessage.warning('请输入有效的存储限制');
+                        return;
+                    }
+
+                    const bytes = Math.floor(Number(value) * 1024 * 1024);
+                    if (!Number.isFinite(bytes) || bytes <= 0) {
+                        ElementPlus.ElMessage.warning('请输入有效的存储限制');
+                        return;
+                    }
+
+                    this.savingImage = true;
+                    try {
+                        const resp = await fetch('/api/setImageStorageLimit', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'session': session
+                            },
+                            body: JSON.stringify({ session, limit: bytes })
+                        });
+
+                        if (resp.status === 401) {
+                            ElementPlus.ElMessage.error('未授权，请重新登录');
+                            window.location.href = '/login.html';
+                            return;
+                        }
+
+                        const data = await resp.json();
+                        if (data.success) {
+                            ElementPlus.ElMessage.success('图片限制已保存');
+                        } else {
+                            ElementPlus.ElMessage.error(data.message || '保存失败');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        ElementPlus.ElMessage.error('保存失败，请重试');
+                    } finally {
+                        this.savingImage = false;
+                    }
+                },
+                async reload() {
+                    this.loading = true;
+                    try {
+                        this.loadRefreshIntervalFromCookie();
+                        await this.fetchTeachingMode();
+                        await this.fetchImageLimit();
+                    } finally {
+                        this.loading = false;
+                    }
+                }
+            },
+            mounted() {
+                this.reload();
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>

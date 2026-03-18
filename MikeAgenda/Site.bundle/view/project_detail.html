@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>项目详情</title>
+    <link href="/vendor/element-plus/index.css" rel="stylesheet">
+    <link href="/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 0; background: #f5f7fa; }
+        #app { min-height: 100vh; padding: 20px; }
+        .page-container { max-width: 980px; margin: 0 auto; }
+        .page-header {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px 18px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .page-title { font-size: 20px; font-weight: 700; color: #303133; }
+        .muted { color: #909399; }
+        
+        /* 日历样式 */
+        .months-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+        }
+        
+        .month-card {
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            background-color: #fff;
+            width: 220px; /* 调小宽度 */
+        }
+        
+        .month-header {
+            background-color: #cce5ff; /* 浅蓝色 */
+            color: #004085;
+            padding: 8px;
+            text-align: center;
+            font-weight: bold;
+            border-radius: 0.375rem 0.375rem 0 0;
+            font-size: 0.9rem;
+        }
+        
+        .month-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            padding: 5px;
+        }
+        
+        .weekday-label {
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.6rem;
+            padding: 3px;
+        }
+        
+        .calendar-day {
+            min-height: 24px;
+            padding: 1px;
+            text-align: center;
+            border-radius: 0.25rem;
+            font-size: 0.6rem;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .calendar-day.empty {
+            background-color: #f8f9fa;
+        }
+        
+        .calendar-day.no-activity {
+            background-color: #e9ecef;
+        }
+        
+        .calendar-day.activity-level-0 {
+            background-color: #cce5ff; /* 最浅的蓝色 */
+        }
+        
+        .calendar-day.activity-level-1 {
+            background-color: #99ccff;
+        }
+        
+        .calendar-day.activity-level-2 {
+            background-color: #66b2ff;
+        }
+        
+        .calendar-day.activity-level-3 {
+            background-color: #3399ff;
+        }
+        
+        .calendar-day.activity-level-4 {
+            background-color: #007bff; /* 默认蓝色 */
+        }
+        
+        .calendar-day.activity-level-5 {
+            background-color: #0066cc;
+        }
+        
+        .calendar-day.activity-level-6 {
+            background-color: #0052a3;
+        }
+        
+        .calendar-day.activity-level-7 {
+            background-color: #003d7a;
+        }
+        
+        .calendar-day.future-day {
+            background-color: #f8f9fa;
+            color: #adb5bd;
+        }
+        
+        .calendar-day:hover {
+            opacity: 0.8;
+        }
+        
+        .day-number {
+            font-weight: bold;
+        }
+        
+        .day-number { font-weight: bold; }
+        .calendar-day:hover { opacity: 0.85; }
+        .calendar-day.empty { cursor: default; }
+        .calendar-day.future-day { cursor: default; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="page-container">
+            <div class="page-header">
+                <el-button circle @click="goBack" aria-label="返回">
+                    <i class="bi bi-arrow-left"></i>
+                </el-button>
+                <div class="page-title">{{ project?.name || '项目详情' }}</div>
+                <div style="margin-left:auto; display:flex; gap: 8px;">
+                    <el-button plain @click="loadAll" :loading="loadingProject || loadingRecords">
+                        <i class="bi bi-arrow-repeat"></i>
+                        刷新
+                    </el-button>
+                </div>
+            </div>
+
+            <el-card shadow="hover" style="border-radius: 12px; margin-bottom: 16px;" v-loading="loadingProject">
+                <template #header>
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap: 12px;">
+                        <div style="display:flex; align-items:center; gap: 12px; min-width: 0;">
+                            <div :style="{ width: '20px', height: '20px', borderRadius: '4px', backgroundColor: project?.color || '#409eff' }"></div>
+                            <div style="font-weight: 700; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                {{ project?.name || '--' }}
+                            </div>
+                        </div>
+                        <el-tag type="info">#{{ project?.id ?? projectId }}</el-tag>
+                    </div>
+                </template>
+
+                <div class="muted" style="margin-bottom: 12px; white-space: pre-wrap;">{{ project?.description || '无描述' }}</div>
+                <div style="display:flex; justify-content:flex-end; gap: 8px; flex-wrap: wrap;">
+                    <el-button type="danger" :loading="deleting" @click="removeProject">删除项目</el-button>
+                    <el-button type="primary" :loading="participating" @click="participate">参与项目</el-button>
+                    <el-button @click="openEdit">编辑项目</el-button>
+                </div>
+            </el-card>
+
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 10px;">
+                <div style="font-weight: 700;">参与记录日历</div>
+                <el-button size="small" plain @click="loadRecords" :loading="loadingRecords">
+                    <i class="bi bi-arrow-repeat"></i>
+                    刷新
+                </el-button>
+            </div>
+
+            <el-card shadow="hover" style="border-radius: 12px;" v-loading="loadingRecords">
+                <el-empty v-if="!loadingRecords && records.length === 0" description="暂无参与记录"></el-empty>
+
+                <div v-if="records.length > 0" class="months-container">
+                    <div v-for="m in months" :key="m.key" class="month-card">
+                        <div class="month-header">{{ m.title }}</div>
+                        <div class="month-grid">
+                            <div v-for="w in weekdays" :key="m.key + '-w-' + w" class="weekday-label">{{ w }}</div>
+
+                            <div v-for="cell in m.cells" :key="cell.key">
+                                <div v-if="cell.type === 'empty'" class="calendar-day empty"></div>
+
+                                <template v-if="cell.type !== 'empty'">
+                                    <template v-if="cell.isFuture">
+                                        <div class="calendar-day future-day">
+                                            <div class="day-number">{{ cell.day }}</div>
+                                        </div>
+                                    </template>
+                                    <template v-if="!cell.isFuture">
+                                        <el-popover trigger="hover" placement="top" width="220">
+                                            <template #reference>
+                                                <div :class="cell.className">
+                                                    <div class="day-number">{{ cell.day }}</div>
+                                                </div>
+                                            </template>
+                                            <div style="font-size: 12px;">
+                                                <div style="font-weight: 700; margin-bottom: 6px;">{{ cell.dateStr }}</div>
+                                                <div v-if="cell.records && cell.records.length">
+                                                    <div style="margin-bottom: 6px;">
+                                                        <strong>{{ cell.records.length }}</strong> 条参与记录:
+                                                    </div>
+                                                    <div v-for="(r, idx) in cell.records" :key="cell.dateStr + '-' + idx" class="muted">
+                                                        {{ idx + 1 }}. {{ formatTime(r.timestamp) }}
+                                                    </div>
+                                                </div>
+                                                <div v-if="!(cell.records && cell.records.length)" class="muted">无参与记录</div>
+                                            </div>
+                                        </el-popover>
+                                    </template>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </el-card>
+
+            <el-dialog v-model="editVisible" title="编辑项目" width="520px">
+                <el-form ref="formRef" :model="edit" :rules="rules" label-width="90px">
+                    <el-form-item label="项目名称" prop="name">
+                        <el-input v-model="edit.name" clearable />
+                    </el-form-item>
+                    <el-form-item label="项目描述">
+                        <el-input v-model="edit.description" type="textarea" :rows="4" />
+                    </el-form-item>
+                    <el-form-item label="项目颜色" prop="color">
+                        <div style="display:flex; align-items:center; gap: 12px;">
+                            <el-color-picker v-model="edit.color" />
+                            <el-input v-model="edit.color" style="max-width: 180px;" placeholder="#RRGGBB" />
+                        </div>
+                    </el-form-item>
+                </el-form>
+                <template #footer>
+                    <el-button @click="editVisible=false">取消</el-button>
+                    <el-button type="primary" :loading="saving" @click="saveEdit">保存</el-button>
+                </template>
+            </el-dialog>
+        </div>
+    </div>
+
+    <script src="/vendor/vue/vue.global.prod.js"></script>
+    <script src="/vendor/element-plus/index.full.js"></script>
+    <script>
+        const { createApp, ref, reactive, computed, onMounted } = Vue;
+        const { ElMessage, ElMessageBox } = ElementPlus;
+
+        createApp({
+            setup() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const projectId = urlParams.get('id');
+
+                const loadingProject = ref(true);
+                const loadingRecords = ref(true);
+                const participating = ref(false);
+                const deleting = ref(false);
+                const saving = ref(false);
+
+                const project = ref(null);
+                const records = ref([]);
+
+                const editVisible = ref(false);
+                const formRef = ref(null);
+                const edit = reactive({
+                    name: '',
+                    description: '',
+                    color: '#409eff'
+                });
+
+                const rules = {
+                    name: [{ required: true, message: '请输入项目名称', trigger: 'blur' }],
+                    color: [{ required: true, message: '请选择项目颜色', trigger: 'change' }]
+                };
+
+                const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+
+                const getSession = () => {
+                    const cookies = document.cookie.split(';');
+                    for (const cookie of cookies) {
+                        const [name, value] = cookie.trim().split('=');
+                        if (name === 'session') return decodeURIComponent(value);
+                    }
+                    return null;
+                };
+
+                const ensureAuth = () => {
+                    const session = getSession();
+                    if (!session) {
+                        window.location.href = '/login.html';
+                        return null;
+                    }
+                    return session;
+                };
+
+                const ensureProjectId = () => {
+                    if (!projectId) {
+                        ElMessage.error('无效的项目 ID');
+                        window.location.href = 'project.html';
+                        return false;
+                    }
+                    return true;
+                };
+
+                const goBack = () => {
+                    window.location.href = 'project.html';
+                };
+
+                const formatTime = (timestamp) => {
+                    const d = new Date(timestamp);
+                    if (Number.isNaN(d.getTime())) return String(timestamp || '--');
+                    return d.toLocaleTimeString('zh-CN', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                    });
+                };
+
+                const pad2 = (n) => String(n).padStart(2, '0');
+
+                const toDateStr = (timestamp) => {
+                    const d = new Date(timestamp);
+                    if (!Number.isNaN(d.getTime())) {
+                        return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+                    }
+
+                    const s = String(timestamp || '');
+                    const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+                    return m ? m[1] : null;
+                };
+
+                const buildRecordsByDate = (rows) => {
+                    const map = {};
+                    let firstRecordDate = null;
+
+                    for (const r of rows) {
+                        const date = toDateStr(r.timestamp);
+                        if (!date) continue;
+                        if (!map[date]) map[date] = [];
+                        map[date].push(r);
+                        if (!firstRecordDate || date < firstRecordDate) firstRecordDate = date;
+                    }
+
+                    return { map, firstRecordDate };
+                };
+
+                const months = computed(() => {
+                    const { map, firstRecordDate } = buildRecordsByDate(records.value);
+                    const today = new Date();
+
+                    let startDate;
+                    if (firstRecordDate) {
+                        const firstDate = new Date(firstRecordDate);
+                        const threeMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+                        startDate = firstDate < threeMonthsAgo
+                            ? threeMonthsAgo
+                            : new Date(firstDate.getFullYear(), firstDate.getMonth(), 1);
+                    } else {
+                        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+                    }
+
+                    const result = [];
+                    const cursor = new Date(startDate);
+                    let monthCount = 0;
+                    while (cursor <= today && monthCount < 3) {
+                        const year = cursor.getFullYear();
+                        const monthIndex = cursor.getMonth();
+                        const key = `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
+                        const title = `${year}年${monthIndex + 1}月`;
+
+                        const firstDay = new Date(year, monthIndex, 1);
+                        const lastDay = new Date(year, monthIndex + 1, 0);
+
+                        const cells = [];
+                        const firstDayOfWeek = firstDay.getDay();
+                        for (let i = 0; i < firstDayOfWeek; i++) {
+                            cells.push({ type: 'empty', key: `${key}-e-${i}` });
+                        }
+
+                        for (let day = 1; day <= lastDay.getDate(); day++) {
+                            const currentDate = new Date(year, monthIndex, day);
+                            const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                            const isFuture = currentDate > today;
+                            const dayRecords = map[dateStr] || [];
+                            const recordCount = dayRecords.length;
+
+                            let className = 'calendar-day no-activity';
+                            if (!isFuture && recordCount > 0) {
+                                const level = Math.min(recordCount, 7);
+                                className = `calendar-day activity-level-${level}`;
+                            }
+                            if (isFuture) className = 'calendar-day future-day';
+
+                            cells.push({
+                                type: 'day',
+                                key: `${key}-d-${day}`,
+                                year,
+                                monthIndex,
+                                day,
+                                dateStr,
+                                isFuture,
+                                className,
+                                records: dayRecords
+                            });
+                        }
+
+                        result.push({ key, title, cells });
+                        cursor.setMonth(cursor.getMonth() + 1);
+                        monthCount++;
+                    }
+
+                    return result;
+                });
+
+                const loadProject = async () => {
+                    if (!ensureProjectId()) return;
+                    const session = ensureAuth();
+                    if (!session) return;
+
+                    loadingProject.value = true;
+                    try {
+                        const res = await fetch(`/api/getProject/${projectId}`, {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'session': session
+                            }
+                        });
+                        if (res.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        if (res.status === 404) {
+                            ElMessage.error('项目未找到');
+                            window.location.href = 'project.html';
+                            return;
+                        }
+                        const data = await res.json();
+                        if (!data.success) throw new Error(data.message || '加载项目失败');
+                        project.value = data.project;
+                    } catch (e) {
+                        console.error(e);
+                        ElMessage.error(e?.message || '加载项目失败');
+                    } finally {
+                        loadingProject.value = false;
+                    }
+                };
+
+                const loadRecords = async () => {
+                    if (!ensureProjectId()) return;
+                    const session = ensureAuth();
+                    if (!session) return;
+
+                    loadingRecords.value = true;
+                    try {
+                        const res = await fetch(`/api/getProjectRecords/${projectId}`, {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'session': session
+                            }
+                        });
+                        if (res.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await res.json();
+                        if (!data.success) throw new Error(data.message || '加载参与记录失败');
+                        records.value = Array.isArray(data.records) ? data.records : [];
+                    } catch (e) {
+                        console.error(e);
+                        ElMessage.error(e?.message || '加载参与记录失败');
+                        records.value = [];
+                    } finally {
+                        loadingRecords.value = false;
+                    }
+                };
+
+                const loadAll = async () => {
+                    await Promise.all([loadProject(), loadRecords()]);
+                };
+
+                const participate = async () => {
+                    if (!ensureProjectId()) return;
+                    const session = ensureAuth();
+                    if (!session) return;
+
+                    participating.value = true;
+                    try {
+                        const res = await fetch('/api/participateInProject', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ projectId, session })
+                        });
+                        if (res.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await res.json();
+                        if (!data.success) throw new Error(data.message || '参与项目失败');
+                        ElMessage.success('已记录参与项目');
+                        await loadRecords();
+                    } catch (e) {
+                        console.error(e);
+                        ElMessage.error(e?.message || '参与项目失败');
+                    } finally {
+                        participating.value = false;
+                    }
+                };
+
+                const removeProject = async () => {
+                    if (!ensureProjectId()) return;
+                    const session = ensureAuth();
+                    if (!session) return;
+
+                    try {
+                        await ElMessageBox.confirm('确定要删除这个项目吗？', '确认删除', {
+                            type: 'warning',
+                            confirmButtonText: '删除',
+                            cancelButtonText: '取消'
+                        });
+                    } catch {
+                        return;
+                    }
+
+                    deleting.value = true;
+                    try {
+                        const res = await fetch(`/api/deleteProject/${projectId}`, {
+                            method: 'DELETE',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ session })
+                        });
+                        if (res.status === 401) {
+                            window.location.href = '/login.html';
+                            return;
+                        }
+                        const data = await res.json();
+                        if (!data.success) throw new Error(data.message || '删除项目失败');
+                        ElMessage.success('项目已删除');
+                        window.location.href = 'project.html';
+                    } catch (e) {
+                        console.error(e);
+                        ElMessage.error(e?.message || '删除项目失败');
+                    } finally {
+                        deleting.value = false;
+                    }
+                };
+
+                const openEdit = () => {
+                    const p = project.value;
+                    if (!p) return;
+                    edit.name = p.name || '';
+                    edit.description = p.description || '';
+                    edit.color = p.color || '#409eff';
+                    editVisible.value = true;
+                };
+
+                const saveEdit = async () => {
+                    if (!formRef.value) return;
+                    await formRef.value.validate(async (valid) => {
+                        if (!valid) return;
+                        if (!ensureProjectId()) return;
+                        const session = ensureAuth();
+                        if (!session) return;
+
+                        saving.value = true;
+                        try {
+                            const res = await fetch(`/api/updateProject/${projectId}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    name: edit.name,
+                                    description: edit.description,
+                                    color: edit.color,
+                                    session
+                                })
+                            });
+                            if (res.status === 401) {
+                                window.location.href = '/login.html';
+                                return;
+                            }
+                            const data = await res.json();
+                            if (!data.success) throw new Error(data.message || '更新项目失败');
+                            ElMessage.success('项目已更新');
+                            editVisible.value = false;
+                            await loadProject();
+                        } catch (e) {
+                            console.error(e);
+                            ElMessage.error(e?.message || '更新项目失败');
+                        } finally {
+                            saving.value = false;
+                        }
+                    });
+                };
+
+                onMounted(async () => {
+                    ensureAuth();
+                    if (!ensureProjectId()) return;
+                    await loadAll();
+                });
+
+                return {
+                    projectId,
+                    weekdays,
+                    loadingProject,
+                    loadingRecords,
+                    participating,
+                    deleting,
+                    saving,
+                    project,
+                    records,
+                    months,
+                    editVisible,
+                    formRef,
+                    edit,
+                    rules,
+                    goBack,
+                    formatTime,
+                    loadProject,
+                    loadRecords,
+                    loadAll,
+                    participate,
+                    removeProject,
+                    openEdit,
+                    saveEdit
+                };
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>

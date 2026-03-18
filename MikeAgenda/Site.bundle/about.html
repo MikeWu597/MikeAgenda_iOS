@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>关于</title>
+    <link href="/vendor/element-plus/index.css" rel="stylesheet">
+    <link href="/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 0; background: #f5f7fa; }
+        #app { min-height: 100vh; padding: 20px; }
+        .page-container { max-width: 720px; margin: 0 auto; }
+        .page-header {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px 18px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .page-title { font-size: 20px; font-weight: 700; color: #303133; }
+        .card { border-radius: 12px; }
+        a { color: inherit; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="page-container">
+            <div class="page-header">
+                <el-button circle @click="goBack" aria-label="返回">
+                    <i class="bi bi-arrow-left"></i>
+                </el-button>
+                <div class="page-title">关于</div>
+            </div>
+
+            <el-card class="card" shadow="hover">
+                <el-descriptions :column="1" border>
+                    <el-descriptions-item label="作者">MikeWu597</el-descriptions-item>
+                    <el-descriptions-item label="版本号">5.0.0</el-descriptions-item>
+                    <el-descriptions-item label="日期">2026年2月3日</el-descriptions-item>
+                    <el-descriptions-item label="GitHub">
+                        <el-link href="https://github.com/MikeWu597/MikeAgenda" target="_blank" type="primary">
+                            https://github.com/MikeWu597/MikeAgenda
+                        </el-link>
+                    </el-descriptions-item>
+                </el-descriptions>
+            </el-card>
+        </div>
+    </div>
+
+    <script src="/vendor/vue/vue.global.prod.js"></script>
+    <script src="/vendor/element-plus/index.full.js"></script>
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            setup() {
+                const goBack = () => {
+                    window.location.href = '/';
+                };
+                return { goBack };
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>
