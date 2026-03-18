@@ -504,9 +504,6 @@
                         <el-dropdown-item @click="goToPage('/status.html')">
                             <i class="bi bi-activity"></i> 系统状态
                         </el-dropdown-item>
-                        <el-dropdown-item @click="logout">
-                            <i class="bi bi-box-arrow-right"></i> 退出登录
-                        </el-dropdown-item>
                         <el-dropdown-item divided @click="goToPage('/tool/farm.html')">
                             <i class="bi bi-camera"></i> 农场监控
                         </el-dropdown-item>
@@ -1076,21 +1073,6 @@
                     window.open('https://h5.xiaonoodles.com/materialQrcodeId=1839797535331319808', '_blank');
                 };
 
-                // 登出
-                const logout = async () => {
-                    try {
-                        await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
-                            confirmButtonText: '确定',
-                            cancelButtonText: '取消',
-                            type: 'warning'
-                        });
-                        document.cookie = 'session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-                        window.location.href = '/login.html';
-                    } catch (error) {
-                        // 用户取消
-                    }
-                };
-
                 // 初始化
                 onMounted(async () => {
                     if (await checkAuth()) {
@@ -1143,8 +1125,7 @@
                     goToPage,
                     goToProject,
                     openFoodOrder,
-                    openNoodleOrder,
-                    logout
+                    openNoodleOrder
                 };
             }
         }).use(ElementPlus).mount('#app');

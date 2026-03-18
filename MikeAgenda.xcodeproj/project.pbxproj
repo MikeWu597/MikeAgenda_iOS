@@ -7,12 +7,38 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		04BF88422F69AD22006E4C2A /* Site.bundle in Resources */ = {isa = PBXBuildFile; fileRef = 04BF88412F69AD21006E4C2A /* Site.bundle */; };
+		04BF88422F69AD22006E4C2A /* MikeAgenda/Site.bundle in Resources */ = {isa = PBXBuildFile; fileRef = 04BF88412F69AD21006E4C2A /* MikeAgenda/Site.bundle */; };
+		04CA000D2F6AAA01006E4C2A /* CourseActivityWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 04CA00012F6AAA01006E4C2A /* CourseActivityWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		04CA000A2F6AAA01006E4C2A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 04BF88222F69AD1B006E4C2A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 04CA00062F6AAA01006E4C2A;
+			remoteInfo = CourseActivityWidgetExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		04CA000C2F6AAA01006E4C2A /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				04CA000D2F6AAA01006E4C2A /* CourseActivityWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		04BF882A2F69AD1B006E4C2A /* MikeAgenda.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MikeAgenda.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		04BF88412F69AD21006E4C2A /* Site.bundle */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.plug-in"; path = "MikeAgenda/Site.bundle"; sourceTree = "<group>"; };
+		04BF88412F69AD21006E4C2A /* MikeAgenda/Site.bundle */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.plug-in"; path = MikeAgenda/Site.bundle; sourceTree = "<group>"; };
+		04CA00012F6AAA01006E4C2A /* CourseActivityWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CourseActivityWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -21,10 +47,22 @@
 			path = MikeAgenda;
 			sourceTree = "<group>";
 		};
+		04CA00022F6AAA01006E4C2A /* CourseActivityWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CourseActivityWidget;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		04BF88272F69AD1B006E4C2A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		04CA00042F6AAA01006E4C2A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -38,7 +76,8 @@
 			isa = PBXGroup;
 			children = (
 				04BF882C2F69AD1B006E4C2A /* MikeAgenda */,
-				04BF88412F69AD21006E4C2A /* Site.bundle */,
+				04CA00022F6AAA01006E4C2A /* CourseActivityWidget */,
+				04BF88412F69AD21006E4C2A /* MikeAgenda/Site.bundle */,
 				04BF882B2F69AD1B006E4C2A /* Products */,
 			);
 			sourceTree = "<group>";
@@ -47,6 +86,7 @@
 			isa = PBXGroup;
 			children = (
 				04BF882A2F69AD1B006E4C2A /* MikeAgenda.app */,
+				04CA00012F6AAA01006E4C2A /* CourseActivityWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -61,10 +101,12 @@
 				04BF88262F69AD1B006E4C2A /* Sources */,
 				04BF88272F69AD1B006E4C2A /* Frameworks */,
 				04BF88282F69AD1B006E4C2A /* Resources */,
+				04CA000C2F6AAA01006E4C2A /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				04CA000B2F6AAA01006E4C2A /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				04BF882C2F69AD1B006E4C2A /* MikeAgenda */,
@@ -75,6 +117,28 @@
 			productName = MikeAgenda;
 			productReference = 04BF882A2F69AD1B006E4C2A /* MikeAgenda.app */;
 			productType = "com.apple.product-type.application";
+		};
+		04CA00062F6AAA01006E4C2A /* CourseActivityWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 04CA00072F6AAA01006E4C2A /* Build configuration list for PBXNativeTarget "CourseActivityWidgetExtension" */;
+			buildPhases = (
+				04CA00032F6AAA01006E4C2A /* Sources */,
+				04CA00042F6AAA01006E4C2A /* Frameworks */,
+				04CA00052F6AAA01006E4C2A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				04CA00022F6AAA01006E4C2A /* CourseActivityWidget */,
+			);
+			name = CourseActivityWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = CourseActivityWidgetExtension;
+			productReference = 04CA00012F6AAA01006E4C2A /* CourseActivityWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -87,6 +151,9 @@
 				LastUpgradeCheck = 2630;
 				TargetAttributes = {
 					04BF88292F69AD1B006E4C2A = {
+						CreatedOnToolsVersion = 26.3;
+					};
+					04CA00062F6AAA01006E4C2A = {
 						CreatedOnToolsVersion = 26.3;
 					};
 				};
@@ -106,6 +173,7 @@
 			projectRoot = "";
 			targets = (
 				04BF88292F69AD1B006E4C2A /* MikeAgenda */,
+				04CA00062F6AAA01006E4C2A /* CourseActivityWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -115,7 +183,14 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				04BF88422F69AD22006E4C2A /* Site.bundle in Resources */,
+				04BF88422F69AD22006E4C2A /* MikeAgenda/Site.bundle in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		04CA00052F6AAA01006E4C2A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -129,7 +204,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		04CA00032F6AAA01006E4C2A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		04CA000B2F6AAA01006E4C2A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 04CA00062F6AAA01006E4C2A /* CourseActivityWidgetExtension */;
+			targetProxy = 04CA000A2F6AAA01006E4C2A /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		04BF88332F69AD1C006E4C2A /* Debug */ = {
@@ -309,6 +399,62 @@
 			};
 			name = Release;
 		};
+		04CA00082F6AAA01006E4C2A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7T69YP7U49;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = CourseActivityWidgetInfo.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = CourseActivityWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cn.matrixecho.MikeAgenda.CourseActivityWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		04CA00092F6AAA01006E4C2A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7T69YP7U49;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = CourseActivityWidgetInfo.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = CourseActivityWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cn.matrixecho.MikeAgenda.CourseActivityWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -326,6 +472,15 @@
 			buildConfigurations = (
 				04BF88362F69AD1C006E4C2A /* Debug */,
 				04BF88372F69AD1C006E4C2A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		04CA00072F6AAA01006E4C2A /* Build configuration list for PBXNativeTarget "CourseActivityWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				04CA00082F6AAA01006E4C2A /* Debug */,
+				04CA00092F6AAA01006E4C2A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

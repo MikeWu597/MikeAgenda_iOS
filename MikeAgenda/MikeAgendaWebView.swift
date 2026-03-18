@@ -1,6 +1,7 @@
 import SwiftUI
 import WebKit
 import UniformTypeIdentifiers
+import ActivityKit
 
 struct MikeAgendaWebView: UIViewRepresentable {
     let profile: ConnectionProfile
@@ -75,6 +76,7 @@ extension MikeAgendaWebView {
         private var loadedToken: String?
         private var onProfileChanged: (() -> Void)?
         private var onColorModeChanged: ((String) -> Void)?
+        private var courseTimer: Timer?
 
         init(profile: ConnectionProfile, onProfileChanged: (() -> Void)?, onColorModeChanged: ((String) -> Void)?) {
             self.profile = profile
@@ -216,17 +218,125 @@ extension MikeAgendaWebView {
         var typographyBootstrapScript: String {
             """
             (() => {
+                const fontCSS = `
+                    html, body, button, input, textarea, select, option,
+                    .el-button, .el-input__inner, .el-input__wrapper, .el-textarea__inner,
+                    .el-select, .el-dropdown-menu, .el-dialog, .el-message-box {
+                        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif !important;
+                    }
+                `;
+
+                const darkCSS = `
+                    /* Body & page background */
+                    html.dark body { background: #0a0a0a !important; color: #E5EAF3 !important; }
+                    html.dark #app { color: #E5EAF3; }
+
+                    /* Page headers & card backgrounds */
+                    html.dark .page-header,
+                    html.dark .page-container { background: #141414 !important; box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important; }
+                    html.dark .el-card { background: #141414 !important; border-color: #414243 !important; }
+                    html.dark .el-card__header { border-bottom-color: #414243 !important; }
+
+                    /* Titles & text */
+                    html.dark .page-title { color: #E5EAF3 !important; }
+                    html.dark .muted, html.dark .meta, html.dark .hint { color: #8D9095 !important; }
+
+                    /* Login page */
+                    html.dark .login-card { background: #141414 !important; box-shadow: 0 2px 12px rgba(0,0,0,0.4) !important; }
+                    html.dark .login-title { color: #E5EAF3 !important; }
+
+                    /* Item cards */
+                    html.dark .item-card { background: #1d1d1d !important; border-color: #414243 !important; }
+                    html.dark .item-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important; }
+                    html.dark .item-title { color: #E5EAF3 !important; }
+                    html.dark .item-description { color: #A3A6AD !important; }
+                    html.dark .item-meta { color: #8D9095 !important; }
+
+                    /* Dash: top header, section cards, loading */
+                    html.dark .top-header { background: #141414 !important; box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important; }
+                    html.dark .header-title, html.dark .section-title { color: #E5EAF3 !important; }
+                    html.dark .loading-box { background: rgba(20, 20, 20, 0.92) !important; }
+                    html.dark .loading-text { color: #A3A6AD !important; }
+                    html.dark #app-loading { background: #0a0a0a !important; }
+                    html.dark .section-card { background: #141414 !important; box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important; }
+                    html.dark .empty-state { color: #8D9095 !important; }
+
+                    /* Checklist */
+                    html.dark .item-card.checked { background: rgba(64,158,255,0.1) !important; }
+                    html.dark .item-name.checked { color: #8D9095 !important; }
+
+                    /* Sortable / drag items */
+                    html.dark .sortable-item { background: #1d1d1d !important; border-color: #414243 !important; }
+                    html.dark .drag-handle { color: #8D9095 !important; }
+
+                    /* Process rows (item_done) */
+                    html.dark .process-row { background: #1d1d1d !important; border-color: #414243 !important; }
+
+                    /* Courses schedule */
+                    html.dark .schedule { color: #E5EAF3 !important; }
+                    html.dark .schedule-header { background: #141414 !important; border-bottom-color: #414243 !important; }
+                    html.dark .head-cell { background: #1a1a1a !important; border-right-color: #414243 !important; }
+                    html.dark .time-col { background: #141414 !important; border-right-color: #414243 !important; }
+                    html.dark .time-head { background: #141414 !important; }
+                    html.dark .time-cell { color: #A3A6AD !important; border-bottom-color: #414243 !important; }
+                    html.dark .time-label { background: rgba(20,20,20,0.85) !important; color: #A3A6AD !important; }
+                    html.dark .day-col { background-color: #141414 !important; border-right-color: #414243 !important; }
+                    html.dark .canvas-wrap { border-color: #414243 !important; }
+
+                    /* Project detail calendar */
+                    html.dark .month-card { border-color: #414243 !important; }
+                    html.dark .month-header { background-color: rgba(64,158,255,0.15) !important; color: #66b3ff !important; }
+                    html.dark .calendar-day.empty,
+                    html.dark .calendar-day.future-day { background-color: #1a1a1a !important; }
+                    html.dark .calendar-day.future-day { color: #606266 !important; }
+                    html.dark .calendar-day.no-activity { background-color: #252525 !important; }
+                    html.dark .activity-level-0 { background-color: rgba(64,158,255,0.08) !important; }
+
+                    /* Farm tool */
+                    html.dark .image-card { background: #1d1d1d !important; box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important; }
+                    html.dark .info-row { color: #A3A6AD !important; }
+                    html.dark .info-label { color: #8D9095 !important; }
+
+                    /* Element Plus overrides for dark */
+                    html.dark .el-divider__text { background-color: #141414 !important; color: #A3A6AD !important; }
+                    html.dark .el-table { background-color: #141414 !important; color: #E5EAF3 !important; }
+                    html.dark .el-table th.el-table__cell { background-color: #1d1d1d !important; }
+                    html.dark .el-table tr { background-color: #141414 !important; }
+                    html.dark .el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell { background: #1a1a1a !important; }
+                    html.dark .el-table td.el-table__cell, html.dark .el-table th.el-table__cell { border-bottom-color: #414243 !important; }
+                    html.dark .el-table--border .el-table__cell { border-right-color: #414243 !important; }
+                    html.dark .el-table__empty-text { color: #8D9095 !important; }
+                    html.dark .el-descriptions__label { color: #A3A6AD !important; }
+                    html.dark .el-descriptions__content { color: #E5EAF3 !important; }
+                    html.dark .el-empty__description p { color: #8D9095 !important; }
+                    html.dark .el-form-item__label { color: #E5EAF3 !important; }
+                    html.dark .el-dropdown-menu { background-color: #1d1d1d !important; border-color: #414243 !important; }
+                    html.dark .el-dropdown-menu__item { color: #E5EAF3 !important; }
+                    html.dark .el-dropdown-menu__item:hover { background-color: #252525 !important; }
+                    html.dark .el-pagination { color: #A3A6AD !important; }
+
+                    /* Inline style overrides via attribute selectors */
+                    html.dark [style*="color: #303133"], html.dark [style*="color:#303133"] { color: #E5EAF3 !important; }
+                    html.dark [style*="color: #606266"], html.dark [style*="color:#606266"] { color: #A3A6AD !important; }
+                    html.dark [style*="color: #909399"], html.dark [style*="color:#909399"] { color: #8D9095 !important; }
+                    html.dark [style*="color: #333"], html.dark [style*="color:#333"] { color: #E5EAF3 !important; }
+                    html.dark [style*="color: #dcdfe6"], html.dark [style*="color:#dcdfe6"] { color: #4C4D4F !important; }
+                    html.dark [style*="color: #004085"], html.dark [style*="color:#004085"] { color: #66b3ff !important; }
+                    html.dark [style*="background: white"], html.dark [style*="background:white"] { background: #1d1d1d !important; }
+                    html.dark [style*="background: #fff"], html.dark [style*="background:#fff"] { background: #1d1d1d !important; }
+                    html.dark [style*="background-color: #fff"], html.dark [style*="background-color:#fff"] { background-color: #1d1d1d !important; }
+                    html.dark [style*="background: #f5f7fa"], html.dark [style*="background:#f5f7fa"] { background: #0a0a0a !important; }
+                    html.dark [style*="background: #f8f9fa"], html.dark [style*="background:#f8f9fa"] { background: #1a1a1a !important; }
+                    html.dark [style*="background-color: #f8f9fa"], html.dark [style*="background-color:#f8f9fa"] { background-color: #1a1a1a !important; }
+                    html.dark [style*="background-color: #e9ecef"], html.dark [style*="background-color:#e9ecef"] { background-color: #252525 !important; }
+                    html.dark [style*="background-color: #cce5ff"], html.dark [style*="background-color:#cce5ff"] { background-color: rgba(64,158,255,0.15) !important; }
+                `;
+
                 const applyTypography = () => {
+                    if (document.querySelector('[data-mikeagenda-typography]')) return;
                     const style = document.createElement('style');
                     style.setAttribute('data-mikeagenda-typography', 'true');
-                    style.textContent = `
-                        html, body, button, input, textarea, select, option,
-                        .el-button, .el-input__inner, .el-input__wrapper, .el-textarea__inner,
-                        .el-select, .el-dropdown-menu, .el-dialog, .el-message-box {
-                            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif !important;
-                        }
-                        html.dark body { background: #0a0a0a; color: #E5EAF3; }
-                    `;
+                    style.textContent = fontCSS + darkCSS;
                     (document.head || document.documentElement).appendChild(style);
                 };
 
@@ -269,6 +379,8 @@ extension MikeAgendaWebView {
                         (document.head || document.documentElement).appendChild(link);
                     }
 
+                    applyTypography();
+
                     if (notify !== false) notifyNative(mode);
                 };
 
@@ -287,8 +399,6 @@ extension MikeAgendaWebView {
                 if (document.readyState === 'loading') {
                     document.addEventListener('DOMContentLoaded', applyTypography, { once: true });
                 }
-
-                applyTypography();
             })();
             """
         }
@@ -387,6 +497,7 @@ extension MikeAgendaWebView {
                        json["success"] as? Bool == true {
                         DispatchQueue.main.async {
                             self.navigateToDash()
+                            self.fetchAndStartCourseActivity()
                         }
                     } else {
                         self.performLogin()
@@ -432,6 +543,7 @@ extension MikeAgendaWebView {
                 DispatchQueue.main.async {
                     self.webView?.evaluateJavaScript("document.cookie='session=\(session); path=/; SameSite=Lax';")
                     self.navigateToDash()
+                    self.fetchAndStartCourseActivity()
                 }
             }.resume()
         }
@@ -457,6 +569,118 @@ extension MikeAgendaWebView {
 
         private func navigateToLogin() {
             webView?.load(URLRequest(url: LocalSiteSchemeHandler.entryURL))
+        }
+
+        // MARK: - Course Live Activity
+
+        private func fetchAndStartCourseActivity() {
+            guard let baseURL = profile.normalizedBaseURL,
+                  let session = persistedSessionValue(),
+                  !session.isEmpty else { return }
+
+            var request = URLRequest(url: baseURL.appendingPathComponent("api/getCourses"))
+            request.httpMethod = "GET"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue(session, forHTTPHeaderField: "session")
+            request.timeoutInterval = 10
+
+            URLSession.shared.dataTask(with: request) { [weak self] data, _, _ in
+                guard let self, let data,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      json["success"] as? Bool == true,
+                      let courses = json["courses"] as? [[String: Any]] else { return }
+
+                let now = Date()
+                let calendar = Calendar.current
+                // JS getDay(): 0=Sun. Swift weekday: 1=Sun → subtract 1
+                let dayOfWeek = calendar.component(.weekday, from: now) - 1
+
+                let todayCourses: [(code: String, name: String, venue: String, start: String, end: String, endDate: Date)] = courses.compactMap { c in
+                    let isActive: Bool
+                    if let intVal = c["is_active"] as? Int { isActive = intVal != 0 }
+                    else if let boolVal = c["is_active"] as? Bool { isActive = boolVal }
+                    else { return nil }
+
+                    guard isActive,
+                          let day = c["day"] as? Int,
+                          day == dayOfWeek else { return nil }
+
+                    let code = c["course_code"] as? String ?? ""
+                    let name = c["course_name"] as? String ?? ""
+                    let venue = c["venue"] as? String ?? ""
+                    let startTime = c["start_time"] as? String ?? "00:00"
+                    let endTime = c["end_time"] as? String ?? "00:00"
+
+                    let endParts = endTime.split(separator: ":").compactMap { Int($0) }
+                    guard endParts.count >= 2,
+                          let endDate = calendar.date(bySettingHour: endParts[0], minute: endParts[1], second: 0, of: now),
+                          endDate > now else { return nil }
+
+                    return (code, name, venue, startTime, endTime, endDate)
+                }.sorted { $0.start < $1.start }
+
+                DispatchQueue.main.async {
+                    self.applyCourseActivity(todayCourses)
+                }
+            }.resume()
+        }
+
+        private func applyCourseActivity(_ courses: [(code: String, name: String, venue: String, start: String, end: String, endDate: Date)]) {
+            courseTimer?.invalidate()
+            courseTimer = nil
+
+            guard !courses.isEmpty,
+                  ActivityAuthorizationInfo().areActivitiesEnabled else {
+                endAllCourseActivities()
+                return
+            }
+
+            let current = courses[0]
+            let remaining = Array(courses.dropFirst())
+
+            let state = CourseActivityAttributes.ContentState(
+                courseCode: current.code,
+                courseName: current.name,
+                venue: current.venue,
+                startTime: current.start,
+                endTime: current.end
+            )
+
+            // Update existing or start new
+            let existingActivities = Activity<CourseActivityAttributes>.activities
+            if let existing = existingActivities.first {
+                Task {
+                    await existing.update(ActivityContent(state: state, staleDate: current.endDate))
+                }
+            } else {
+                let attributes = CourseActivityAttributes()
+                let content = ActivityContent(state: state, staleDate: current.endDate)
+                do {
+                    _ = try Activity.request(attributes: attributes, content: content)
+                } catch {
+                    print("Failed to start course activity: \(error)")
+                }
+            }
+
+            // Schedule timer for when current course ends
+            courseTimer = Timer.scheduledTimer(withTimeInterval: current.endDate.timeIntervalSinceNow, repeats: false) { [weak self] _ in
+                guard let self else { return }
+                if remaining.isEmpty {
+                    self.endAllCourseActivities()
+                } else {
+                    self.applyCourseActivity(remaining)
+                }
+            }
+        }
+
+        private func endAllCourseActivities() {
+            courseTimer?.invalidate()
+            courseTimer = nil
+            for activity in Activity<CourseActivityAttributes>.activities {
+                Task {
+                    await activity.end(nil, dismissalPolicy: .immediate)
+                }
+            }
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
