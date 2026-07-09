@@ -14,6 +14,14 @@ struct RenewalCategoryListView: View {
             else {
                 ForEach(categories) { cat in
                     Text(cat.name)
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                Task {
+                                    try? await APIClient.shared.deleteRenewalCategory(id: cat.id)
+                                    await load()
+                                }
+                            } label: { Label("删除", systemImage: "trash") }
+                        }
                 }
             }
         }

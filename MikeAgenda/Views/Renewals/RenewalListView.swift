@@ -5,7 +5,6 @@ struct RenewalListView: View {
     @State private var categories: [RenewalCategory] = []
     @State private var isLoading = true
     @State private var showForm = false
-    @State private var editRenewal: Renewal?
 
     var body: some View {
         List {
@@ -19,8 +18,8 @@ struct RenewalListView: View {
                     if !items.isEmpty {
                         Section(cat.name) {
                             ForEach(items) { renewal in
-                                Button {
-                                    editRenewal = renewal
+                                NavigationLink {
+                                    RenewalEditView(renewal: renewal, categories: categories, onSaved: { Task { await load() } })
                                 } label: {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(renewal.name)
@@ -37,9 +36,15 @@ struct RenewalListView: View {
                                             .foregroundColor(.secondary)
                                         }
                                     }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
                                 }
-                                .buttonStyle(.plain)
+                                .swipeActions(edge: .trailing) {
+                                    Button(role: .destructive) {
+                                        Task {
+                                            try? await APIClient.shared.deleteRenewal(id: renewal.id)
+                                            await load()
+                                        }
+                                    } label: { Label("删除", systemImage: "trash") }
+                                }
                             }
                         }
                     }
@@ -55,9 +60,6 @@ struct RenewalListView: View {
         .refreshable { await load() }
         .sheet(isPresented: $showForm) {
             NavigationStack { RenewalFormView(onSaved: { Task { await load() } }) }
-        }
-        .sheet(item: $editRenewal) { renewal in
-            RenewalDetailView(renewal: renewal, onUpdate: { Task { await load() } })
         }
     }
 

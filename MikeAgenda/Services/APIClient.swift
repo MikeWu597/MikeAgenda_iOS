@@ -203,6 +203,17 @@ final class APIClient {
         ])
     }
 
+    func updateRenewal(id: Int, name: String, description: String, expiryDate: String, reminderDays: Int, categoryID: Int) async throws {
+        try await put("/api/updateRenewals/\(id)", body: [
+            "name": name, "description": description,
+            "expiryDate": expiryDate, "reminderDays": String(reminderDays), "categoryId": categoryID
+        ])
+    }
+
+    func deleteRenewal(id: Int) async throws {
+        try await delete("/api/deleteRenewals/\(id)")
+    }
+
     func getAllRenewalCategories() async throws -> [RenewalCategory] {
         let data = try await post("/api/getAllRenewalCategories", body: EmptyBody())
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -220,6 +231,10 @@ final class APIClient {
         try await post("/api/createRenewalCategories", body: [
             "name": name, "color": color, "description": description
         ])
+    }
+
+    func deleteRenewalCategory(id: Int) async throws {
+        try await delete("/api/deleteRenewalCategories/\(id)")
     }
 
     // MARK: - Settings
@@ -295,6 +310,20 @@ final class APIClient {
         if let token = sessionToken {
             request.httpBody = try JSONSerialization.data(withJSONObject: ["session": token])
         }
+        let (data, response) = try await session.data(for: request)
+        try validate(response: response, data: data)
+    }
+
+    private func put(_ path: String, body: [String: Any]) async throws {
+        guard let baseURL else { throw APIError.notConfigured }
+        let url = baseURL.appendingPathComponent(path)
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        applySession(to: &request)
+        var merged = body
+        if let token = sessionToken { merged["session"] = token }
+        request.httpBody = try JSONSerialization.data(withJSONObject: merged)
         let (data, response) = try await session.data(for: request)
         try validate(response: response, data: data)
     }
