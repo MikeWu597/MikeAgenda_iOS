@@ -199,14 +199,14 @@ final class APIClient {
     func createRenewal(name: String, description: String, expiryDate: String, reminderDays: Int, categoryID: Int) async throws {
         try await post("/api/createRenewals", body: [
             "name": name, "description": description,
-            "expiryDate": expiryDate, "reminderDays": reminderDays, "categoryId": categoryID
+            "expiryDate": expiryDate, "reminderDays": reminderDays, "categoryId": String(categoryID)
         ])
     }
 
     func updateRenewal(id: Int, name: String, description: String, expiryDate: String, reminderDays: Int, categoryID: Int) async throws {
         try await put("/api/updateRenewals/\(id)", body: [
             "name": name, "description": description,
-            "expiryDate": expiryDate, "reminderDays": String(reminderDays), "categoryId": categoryID
+            "expiryDate": expiryDate, "reminderDays": String(reminderDays), "categoryId": String(categoryID)
         ])
     }
 
@@ -234,7 +234,7 @@ final class APIClient {
     }
 
     func deleteRenewalCategory(id: Int) async throws {
-        try await delete("/api/deleteRenewalCategories/\(id)")
+        try await post("/api/deleteRenewalCategories/\(id)", body: EmptyBody())
     }
 
     // MARK: - Settings

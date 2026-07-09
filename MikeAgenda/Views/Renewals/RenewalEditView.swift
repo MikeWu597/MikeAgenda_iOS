@@ -37,6 +37,7 @@ struct RenewalEditView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             name = renewal.name
+            description = renewal.description ?? ""
             if let exp = renewal.expiryDate, exp.count >= 10 {
                 let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
                 expiryDate = f.date(from: String(exp.prefix(10))) ?? Date()
@@ -56,7 +57,7 @@ struct RenewalEditView: View {
                     expiryDate: f.string(from: expiryDate),
                     reminderDays: reminderDays, categoryID: selectedCategoryID
                 )
-                await MainActor.run { onSaved() }
+                await MainActor.run { isLoading = false; onSaved() }
             } catch {
                 await MainActor.run { isLoading = false }
             }

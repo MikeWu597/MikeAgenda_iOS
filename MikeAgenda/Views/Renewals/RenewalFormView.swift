@@ -52,11 +52,15 @@ struct RenewalFormView: View {
         isLoading = true
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
         Task {
-            try? await APIClient.shared.createRenewal(
-                name: name, description: description, expiryDate: f.string(from: expiryDate),
-                reminderDays: reminderDays, categoryID: selectedCategoryID
-            )
-            await MainActor.run { onSaved(); dismiss() }
+            do {
+                try await APIClient.shared.createRenewal(
+                    name: name, description: description, expiryDate: f.string(from: expiryDate),
+                    reminderDays: reminderDays, categoryID: selectedCategoryID
+                )
+                await MainActor.run { onSaved(); dismiss() }
+            } catch {
+                await MainActor.run { isLoading = false }
+            }
         }
     }
 }
