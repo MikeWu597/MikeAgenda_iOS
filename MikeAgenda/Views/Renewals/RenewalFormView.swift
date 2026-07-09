@@ -18,7 +18,10 @@ struct RenewalFormView: View {
             Section("名称") { TextField("请输入名称", text: $name) }
             Section("描述") { TextField("描述（可选）", text: $description) }
             Section("到期日") { DatePicker("到期日期", selection: $expiryDate, displayedComponents: .date) }
-            Section("提前提醒天数") { Stepper("\(reminderDays) 天", value: $reminderDays, in: 0...365) }
+            Section("提前提醒天数") {
+                TextField("天数", value: $reminderDays, format: .number)
+                    .keyboardType(.numberPad)
+            }
             Section("分类") {
                 if categories.isEmpty { Text("暂无分类").foregroundColor(.secondary) }
                 else {

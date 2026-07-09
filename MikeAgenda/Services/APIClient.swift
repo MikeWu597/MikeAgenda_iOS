@@ -36,6 +36,7 @@ final class APIClient {
     private let decoder: JSONDecoder = { let d = JSONDecoder(); return d }()
 
     var onUnauthorized: (() -> Void)?
+    var suppressUnauthorized = false
 
     private var baseURL: URL? { ConnectionProfileStore.load().normalizedBaseURL }
     private var sessionToken: String? { SessionService.shared.session }
@@ -291,6 +292,9 @@ final class APIClient {
         request.httpMethod = "DELETE"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         applySession(to: &request)
+        if let token = sessionToken {
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["session": token])
+        }
         let (data, response) = try await session.data(for: request)
         try validate(response: response, data: data)
     }
@@ -343,7 +347,7 @@ final class APIClient {
     private func validate(response: URLResponse, data: Data) throws {
         guard let httpResponse = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         if httpResponse.statusCode == 401 {
-            onUnauthorized?()
+            if !suppressUnauthorized { onUnauthorized?() }
             throw APIError.unauthorized
         }
         if httpResponse.statusCode >= 400 {

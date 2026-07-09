@@ -60,20 +60,18 @@ struct CalendarHeatmap: View {
 
     var body: some View {
         let dates = last12Months()
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(alignment: .top, spacing: 8) {
-                ForEach(dates, id: \.self) { monthStart in
-                    MonthGrid(month: monthStart, records: records, accent: color)
-                }
+        VStack(spacing: 12) {
+            ForEach(dates, id: \.self) { monthStart in
+                MonthGrid(month: monthStart, records: records, accent: color)
             }
         }
+        .frame(maxWidth: .infinity)
     }
 
     private func last12Months() -> [Date] {
         let now = Date()
         return (0..<3).compactMap { calendar.date(byAdding: .month, value: -$0, to: now) }
             .map { calendar.date(from: calendar.dateComponents([.year, .month], from: $0))! }
-            .reversed()
     }
 }
 

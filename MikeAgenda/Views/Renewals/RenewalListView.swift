@@ -5,6 +5,7 @@ struct RenewalListView: View {
     @State private var categories: [RenewalCategory] = []
     @State private var isLoading = true
     @State private var showForm = false
+    @State private var editRenewal: Renewal?
 
     var body: some View {
         List {
@@ -18,20 +19,27 @@ struct RenewalListView: View {
                     if !items.isEmpty {
                         Section(cat.name) {
                             ForEach(items) { renewal in
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(renewal.name)
-                                        .font(.system(size: 15, weight: .medium))
-                                    if let expiry = renewal.expiryDate?.prefix(10) {
-                                        HStack {
-                                            Text("到期: \(String(expiry))")
-                                            if let days = renewal.reminderDays {
-                                                Text("(提前\(days)天提醒)")
+                                Button {
+                                    editRenewal = renewal
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(renewal.name)
+                                            .font(.system(size: 15, weight: .medium))
+                                            .foregroundColor(.primary)
+                                        if let expiry = renewal.expiryDate?.prefix(10) {
+                                            HStack {
+                                                Text("到期: \(String(expiry))")
+                                                if let days = renewal.reminderDays {
+                                                    Text("(提前\(days)天提醒)")
+                                                }
                                             }
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
                                         }
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
                                     }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                                 }
+                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -40,12 +48,16 @@ struct RenewalListView: View {
         }
         .navigationTitle("续订提醒")
         .toolbar {
+            NavigationLink { RenewalCategoryListView() } label: { Image(systemName: "tag") }
             Button { showForm = true } label: { Image(systemName: "plus") }
         }
         .task { await load() }
         .refreshable { await load() }
         .sheet(isPresented: $showForm) {
             NavigationStack { RenewalFormView(onSaved: { Task { await load() } }) }
+        }
+        .sheet(item: $editRenewal) { renewal in
+            RenewalDetailView(renewal: renewal, onUpdate: { Task { await load() } })
         }
     }
 

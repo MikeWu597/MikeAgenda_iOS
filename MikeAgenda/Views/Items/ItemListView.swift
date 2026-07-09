@@ -41,6 +41,9 @@ struct ItemListView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 HStack(spacing: 8) {
+                    NavigationLink { CategoryListView() } label: {
+                        Image(systemName: "tag")
+                    }
                     Button { showDone = true } label: {
                         Image(systemName: "checkmark.circle")
                     }

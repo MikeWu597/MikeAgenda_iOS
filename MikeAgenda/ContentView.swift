@@ -72,9 +72,7 @@ struct MoreView: View {
             Section("管理") {
                 NavigationLink { CycleListView() } label: { Label("周期任务", systemImage: "arrow.triangle.2.circlepath") }
                 NavigationLink { RenewalListView() } label: { Label("续订提醒", systemImage: "bell") }
-                NavigationLink { RenewalCategoryListView() } label: { Label("续费分类", systemImage: "tag") }
                 NavigationLink { ProjectListView() } label: { Label("项目", systemImage: "folder") }
-                NavigationLink { CategoryListView() } label: { Label("分类", systemImage: "tag") }
                 NavigationLink { ChecklistListView() } label: { Label("检查清单", systemImage: "checklist") }
             }
 
