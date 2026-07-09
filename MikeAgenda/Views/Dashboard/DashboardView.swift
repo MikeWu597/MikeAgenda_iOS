@@ -2,55 +2,30 @@ import SwiftUI
 
 struct DashboardView: View {
     @StateObject private var viewModel = DashboardViewModel()
-    @State private var showPlusMenu = false
 
     var body: some View {
-        ZStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    DateHeader(date: $viewModel.selectedDate, onDateChanged: { viewModel.loadAll() })
-                        .padding(.horizontal)
-                        .padding(.vertical, 12)
-                        .background(.regularMaterial)
+        ScrollView {
+            VStack(spacing: 0) {
+                DateHeader(date: $viewModel.selectedDate, onDateChanged: { viewModel.loadAll() })
+                    .padding(.horizontal)
+                    .padding(.vertical, 12)
+                    .background(.regularMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
 
-                    if viewModel.isLoading {
-                        LoadingOverlay()
-                            .padding(.top, 60)
-                    } else {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 360), spacing: 16)], spacing: 16) {
-                            courseSection
-                            todoSection
-                            cycleSection
-                            renewalSection
-                            projectSection
-                        }
-                        .padding(16)
+                if viewModel.isLoading {
+                    LoadingOverlay()
+                        .padding(.top, 60)
+                } else {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 360), spacing: 16)], spacing: 16) {
+                        courseSection
+                        todoSection
+                        cycleSection
+                        renewalSection
+                        projectSection
                     }
-                }
-            }
-
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    Menu {
-                        Button { /* navigate to items */ } label: { Label("事项", systemImage: "list.bullet") }
-                        Button { /* navigate to courses */ } label: { Label("课程表", systemImage: "calendar") }
-                        Button { /* navigate to cycles */ } label: { Label("周期", systemImage: "arrow.triangle.2.circlepath") }
-                        Button { /* navigate to renewals */ } label: { Label("续订", systemImage: "bell") }
-                        Divider()
-                        Button { /* navigate to settings */ } label: { Label("设置", systemImage: "gear") }
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.title3.bold())
-                            .frame(width: 56, height: 56)
-                            .background(.blue)
-                            .foregroundColor(.white)
-                            .clipShape(Circle())
-                            .shadow(radius: 4)
-                    }
-                    .padding(.trailing, 24)
-                    .padding(.bottom, 24)
+                    .padding(16)
                 }
             }
         }
