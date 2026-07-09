@@ -27,8 +27,7 @@ final class CourseListViewModel: ObservableObject {
     }
 
     func delete(_ course: Course) async {
-        guard let id = course.id else { return }
-        try? await APIClient.shared.deleteCourse(id: id)
+        try? await APIClient.shared.deleteCourse(id: course.id)
         await load()
     }
 }

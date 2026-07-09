@@ -1,7 +1,7 @@
 import Foundation
 
 struct Course: Identifiable, Codable, Equatable {
-    var id: Int?
+    var id: Int
     var courseCode: String
     var courseName: String
     var courseColor: String?
@@ -24,18 +24,19 @@ struct Course: Identifiable, Codable, Equatable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = (try? container.decode(Int.self, forKey: .id)) ?? Int((try? container.decode(String.self, forKey: .id)) ?? "")
-        courseCode = try container.decode(String.self, forKey: .courseCode)
-        courseName = try container.decode(String.self, forKey: .courseName)
+        id = (try? container.decode(Int.self, forKey: .id)) ?? Int((try? container.decode(String.self, forKey: .id)) ?? "") ?? 0
+        courseCode = (try? container.decode(String.self, forKey: .courseCode)) ?? ""
+        courseName = (try? container.decode(String.self, forKey: .courseName)) ?? ""
+        if id == 0 { id = abs(courseCode.hashValue) }
         courseColor = try container.decodeIfPresent(String.self, forKey: .courseColor)
         venue = try container.decodeIfPresent(String.self, forKey: .venue)
         day = (try? container.decode(Int.self, forKey: .day)) ?? Int((try? container.decode(String.self, forKey: .day)) ?? "") ?? 0
-        startTime = try container.decode(String.self, forKey: .startTime)
-        endTime = try container.decode(String.self, forKey: .endTime)
+        startTime = (try? container.decode(String.self, forKey: .startTime)) ?? ""
+        endTime = (try? container.decode(String.self, forKey: .endTime)) ?? ""
         isActive = try container.decodeIfPresent(Bool.self, forKey: .isActive) ?? ((try? container.decode(Int.self, forKey: .isActive)) != 0)
     }
 
-    init(id: Int?, courseCode: String, courseName: String, courseColor: String?, venue: String?, day: Int, startTime: String, endTime: String, isActive: Bool) {
+    init(id: Int, courseCode: String, courseName: String, courseColor: String?, venue: String?, day: Int, startTime: String, endTime: String, isActive: Bool) {
         self.id = id
         self.courseCode = courseCode
         self.courseName = courseName

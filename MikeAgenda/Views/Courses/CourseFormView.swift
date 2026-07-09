@@ -86,7 +86,7 @@ struct CourseFormView: View {
         tf.dateFormat = "HH:mm"
 
         let course = Course(
-            id: course?.id,
+            id: self.course?.id ?? 0,
             courseCode: courseCode,
             courseName: courseName,
             courseColor: courseColor,

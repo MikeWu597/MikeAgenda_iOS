@@ -132,7 +132,33 @@ final class APIClient {
 
     func getCourses() async throws -> [Course] {
         let data = try await get("/api/getCourses")
-        return (try decoder.decode(CoursesResponse.self, from: data)).courses ?? []
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let list = json["courses"] as? [[String: Any]] {
+            return list.compactMap { item in
+                let id = (item["id"] as? Int) ?? Int(item["id"] as? String ?? "") ?? 0
+                let code = item["course_code"] as? String ?? ""
+                let name = item["course_name"] as? String ?? ""
+                guard !code.isEmpty else { return nil }
+                let isActive: Bool
+                if let b = item["is_active"] as? Bool { isActive = b }
+                else if let i = item["is_active"] as? Int { isActive = i != 0 }
+                else if let s = item["is_active"] as? String { isActive = Int(s) != 0 }
+                else { isActive = true }
+                let day: Int
+                if let d = item["day"] as? Int { day = d }
+                else if let s = item["day"] as? String { day = Int(s) ?? 0 }
+                else { day = 0 }
+                return Course(id: id > 0 ? id : abs(code.hashValue),
+                    courseCode: code, courseName: name,
+                    courseColor: item["course_color"] as? String,
+                    venue: item["venue"] as? String,
+                    day: day,
+                    startTime: item["start_time"] as? String ?? "",
+                    endTime: item["end_time"] as? String ?? "",
+                    isActive: isActive)
+            }
+        }
+        return []
     }
 
     func addOrUpdateCourse(_ course: Course) async throws {
@@ -147,7 +173,7 @@ final class APIClient {
             "course_color": course.courseColor ?? "",
             "instructor_name": ""
         ]
-        if let id = course.id { body["id"] = id }
+        if course.id > 0 { body["id"] = course.id }
         try await post("/api/addOrUpdateCourse", body: body)
     }
 
