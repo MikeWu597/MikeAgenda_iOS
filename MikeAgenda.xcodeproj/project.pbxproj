@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		04BF88422F69AD22006E4C2A /* MikeAgenda/Site.bundle in Resources */ = {isa = PBXBuildFile; fileRef = 04BF88412F69AD21006E4C2A /* MikeAgenda/Site.bundle */; };
 		04CA000D2F6AAA01006E4C2A /* CourseActivityWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 04CA00012F6AAA01006E4C2A /* CourseActivityWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -37,7 +36,6 @@
 
 /* Begin PBXFileReference section */
 		04BF882A2F69AD1B006E4C2A /* MikeAgenda.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MikeAgenda.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		04BF88412F69AD21006E4C2A /* MikeAgenda/Site.bundle */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.plug-in"; path = MikeAgenda/Site.bundle; sourceTree = "<group>"; };
 		04CA00012F6AAA01006E4C2A /* CourseActivityWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CourseActivityWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -77,7 +75,6 @@
 			children = (
 				04BF882C2F69AD1B006E4C2A /* MikeAgenda */,
 				04CA00022F6AAA01006E4C2A /* CourseActivityWidget */,
-				04BF88412F69AD21006E4C2A /* MikeAgenda/Site.bundle */,
 				04BF882B2F69AD1B006E4C2A /* Products */,
 			);
 			sourceTree = "<group>";
@@ -183,7 +180,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				04BF88422F69AD22006E4C2A /* MikeAgenda/Site.bundle in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

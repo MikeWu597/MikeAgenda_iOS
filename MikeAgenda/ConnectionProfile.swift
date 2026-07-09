@@ -94,6 +94,28 @@ enum ConnectionProfileStore {
         store.removeValue(forKey: webCookiesKey)
     }
 
+    private static let sessionKey = "mikeagenda.session"
+
+    static func loadSession() -> String? {
+        store.secureValue(forKey: sessionKey)
+    }
+
+    static func saveSession(_ token: String) {
+        do {
+            try store.setSecureValue(token, forKey: sessionKey)
+        } catch {
+            assertionFailure(error.localizedDescription)
+        }
+    }
+
+    static func clearSession() {
+        do {
+            try store.removeSecureValue(forKey: sessionKey)
+        } catch {
+            assertionFailure(error.localizedDescription)
+        }
+    }
+
     private static let colorModeKey = "mikeagenda.colorMode"
 
     static func loadColorMode() -> String {
