@@ -175,6 +175,7 @@ struct CourseListView: View {
                 .stroke(course.isActive ? .clear : Color(hex: course.courseColor ?? "#409eff").opacity(0.5), lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 4))
+        .contentShape(RoundedRectangle(cornerRadius: 4))
         .onTapGesture { editCourse = course }
         .contextMenu {
             Button {
