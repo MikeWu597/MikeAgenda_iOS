@@ -19,7 +19,11 @@ struct Cycle: Identifiable, Codable, Equatable {
         id = (try? container.decode(Int.self, forKey: .id)) ?? Int((try? container.decode(String.self, forKey: .id)) ?? "") ?? 0
         name = try container.decodeIfPresent(String.self, forKey: .name)
         title = try container.decodeIfPresent(String.self, forKey: .title)
-        cycle = try container.decodeIfPresent(String.self, forKey: .cycle)
+        if let str = try? container.decode(String.self, forKey: .cycle) {
+            cycle = str
+        } else {
+            cycle = nil
+        }
         nextTime = try container.decodeIfPresent(String.self, forKey: .nextTime)
         isActive = try container.decodeIfPresent(Bool.self, forKey: .isActive) ?? ((try? container.decode(Int.self, forKey: .isActive)) != 0)
     }

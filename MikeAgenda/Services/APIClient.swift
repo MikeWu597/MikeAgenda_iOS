@@ -205,14 +205,14 @@ final class APIClient {
         ])
     }
 
-    func deleteCycle(id: Int) async throws { try await post("/api/deleteCycle", body: ["id": id]) }
+    func deleteCycle(id: Int) async throws { try await post("/api/deleteCycle", body: ["id": String(id)]) }
 
     func updateCycleNextTime(id: Int, nexttime: String) async throws {
-        try await post("/api/updateCycleNextTime", body: ["id": id, "nexttime": nexttime])
+        try await post("/api/updateCycleNextTime", body: ["id": String(id), "nexttime": nexttime])
     }
 
     func delayCycleNextDate(id: Int) async throws {
-        try await post("/api/delayCycleNextDate", body: ["id": id])
+        try await post("/api/delayCycleNextDate", body: ["id": String(id)])
     }
 
     // MARK: - Renewals
