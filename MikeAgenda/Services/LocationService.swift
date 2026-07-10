@@ -6,9 +6,11 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
 
     @Published var isInShenzhen = false
     @Published var locationChecked = false
+    @Published var currentLocation: CLLocation?
 
     private let manager = CLLocationManager()
     private let cacheKey = "mikeagenda.inShenzhen"
+    private var isTracking = false
 
     private override init() {
         super.init()
@@ -33,6 +35,23 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
         }
     }
 
+    func startTracking() {
+        guard !isTracking,
+              CLLocationManager.locationServicesEnabled(),
+              manager.authorizationStatus == .authorizedWhenInUse || manager.authorizationStatus == .authorizedAlways
+        else { return }
+        isTracking = true
+        manager.desiredAccuracy = kCLLocationAccuracyBest
+        manager.distanceFilter = 5
+        manager.startUpdatingLocation()
+    }
+
+    func stopTracking() {
+        isTracking = false
+        manager.stopUpdatingLocation()
+        manager.desiredAccuracy = kCLLocationAccuracyKilometer
+    }
+
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         let status = manager.authorizationStatus
         if status == .authorizedWhenInUse || status == .authorizedAlways {
@@ -48,6 +67,9 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
         isInShenzhen = inSZ
         locationChecked = true
         UserDefaults.standard.set(inSZ, forKey: cacheKey)
+        if isTracking {
+            currentLocation = loc
+        }
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {

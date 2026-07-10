@@ -36,7 +36,7 @@ final class TrainTicketService: ObservableObject {
                 if trainCodeMapDate != dateKey {
                     Task { try? await loadTrainCodeMap(dateKey: dateKey) }
                 }
-                tickets = try parseResponse(data: cached)
+                tickets = try parseResponse(data: cached).filter { !isDeparted($0) }
                 return
             }
 
@@ -52,7 +52,7 @@ final class TrainTicketService: ObservableObject {
                 try? await loadTrainCodeMap(dateKey: dateKey)
             }
 
-            tickets = try await queryTickets(date: date, cacheKey: cacheKey)
+            tickets = try await queryTickets(date: date, cacheKey: cacheKey).filter { !isDeparted($0) }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -200,6 +200,14 @@ final class TrainTicketService: ObservableObject {
         case "NFZ": return "福田"
         default: return name
         }
+    }
+
+    private func isDeparted(_ ticket: TrainTicket) -> Bool {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd HH:mm"
+        let today = df.string(from: Date()).prefix(10)
+        guard let departure = df.date(from: "\(today) \(ticket.fromTime)") else { return false }
+        return departure < Date()
     }
 
     private func parseTicket(from raw: String, seatTypes: SeatTypeInfo) -> TrainTicket? {
