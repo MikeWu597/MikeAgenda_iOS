@@ -44,8 +44,12 @@ struct DateHeader: View {
     var body: some View {
         HStack(spacing: 8) {
             Button {
-                date = Calendar.current.date(byAdding: .day, value: -1, to: date) ?? date
-                onDateChanged?()
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    date = Calendar.current.date(byAdding: .day, value: -1, to: date) ?? date
+                    onDateChanged?()
+                }
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.body.weight(.medium))
@@ -58,8 +62,12 @@ struct DateHeader: View {
                 .onChange(of: date) { _ in onDateChanged?() }
 
             Button {
-                date = Calendar.current.date(byAdding: .day, value: 1, to: date) ?? date
-                onDateChanged?()
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    date = Calendar.current.date(byAdding: .day, value: 1, to: date) ?? date
+                    onDateChanged?()
+                }
             } label: {
                 Image(systemName: "chevron.right")
                     .font(.body.weight(.medium))
