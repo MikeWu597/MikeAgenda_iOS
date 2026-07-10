@@ -1,6 +1,6 @@
 import Foundation
 
-struct TrainTicket: Identifiable, Codable {
+struct TrainTicket: Identifiable, Codable, Equatable {
     var id: String { "\(trainNo)_\(fromTime)_\(toTime)" }
 
     let trainNo: String

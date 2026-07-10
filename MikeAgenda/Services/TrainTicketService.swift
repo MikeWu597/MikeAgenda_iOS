@@ -24,16 +24,24 @@ final class TrainTicketService: ObservableObject {
     private var trainCodeMapDate: String?
 
     func fetchTickets(for date: Date = Date()) async {
-        isLoading = true
         errorMessage = nil
-        tickets = []
-
-        defer { isLoading = false }
 
         do {
             let df = DateFormatter()
             df.dateFormat = "yyyy-MM-dd"
             let dateKey = df.string(from: date)
+            let cacheKey = "train_cache_\(dateKey)"
+
+            if let cached = UserDefaults.standard.data(forKey: cacheKey) {
+                if trainCodeMapDate != dateKey {
+                    Task { try? await loadTrainCodeMap(dateKey: dateKey) }
+                }
+                tickets = try parseResponse(data: cached)
+                return
+            }
+
+            isLoading = true
+            defer { isLoading = false }
 
             if !cookiesReady {
                 try await obtainCookies()
@@ -44,8 +52,7 @@ final class TrainTicketService: ObservableObject {
                 try? await loadTrainCodeMap(dateKey: dateKey)
             }
 
-            let tickets = try await queryTickets(date: date)
-            self.tickets = tickets
+            tickets = try await queryTickets(date: date, cacheKey: cacheKey)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -93,7 +100,7 @@ final class TrainTicketService: ObservableObject {
         trainCodeMapDate = dateKey
     }
 
-    private func queryTickets(date: Date) async throws -> [TrainTicket] {
+    private func queryTickets(date: Date, cacheKey: String) async throws -> [TrainTicket] {
         let df = DateFormatter()
         df.dateFormat = "yyyy-MM-dd"
         let dateStr = df.string(from: date)
@@ -115,6 +122,7 @@ final class TrainTicketService: ObservableObject {
             throw TrainServiceError.queryFailed
         }
 
+        UserDefaults.standard.set(data, forKey: cacheKey)
         return try parseResponse(data: data)
     }
 
