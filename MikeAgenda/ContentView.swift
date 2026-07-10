@@ -33,6 +33,8 @@ struct ContentView: View {
 }
 
 struct MainTabView: View {
+    @ObservedObject private var locationService = LocationService.shared
+
     var body: some View {
         TabView {
             NavigationStack {
@@ -56,6 +58,15 @@ struct MainTabView: View {
                 Label("课表", systemImage: "calendar")
             }
 
+            if locationService.isInShenzhen {
+                NavigationStack {
+                    ShenzhenView()
+                }
+                .tabItem {
+                    Label("深圳", systemImage: "building.2.fill")
+                }
+            }
+
             NavigationStack {
                 MoreView()
             }
@@ -63,6 +74,7 @@ struct MainTabView: View {
                 Label("更多", systemImage: "ellipsis")
             }
         }
+        .onAppear { locationService.requestLocation() }
     }
 }
 
