@@ -20,6 +20,9 @@ final class SessionService: ObservableObject {
         session = token
         isAuthenticated = true
         ConnectionProfileStore.saveSession(token)
+        if let url = ConnectionProfileStore.load().normalizedBaseURL?.absoluteString {
+            ConnectionProfileStore.saveBaseURL(url)
+        }
     }
 
     func clear() {

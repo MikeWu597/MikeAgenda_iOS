@@ -108,6 +108,16 @@ enum ConnectionProfileStore {
         }
     }
 
+    private static let baseURLKey = "mikeagenda.baseURL"
+
+    static func saveBaseURL(_ url: String) {
+        do {
+            try store.setSecureValue(url, forKey: baseURLKey)
+        } catch {
+            assertionFailure(error.localizedDescription)
+        }
+    }
+
     static func clearSession() {
         do {
             try store.removeSecureValue(forKey: sessionKey)
@@ -194,6 +204,7 @@ final class NativeStore {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: key,
+            kSecAttrAccessGroup as String: "7T69YP7U49.cn.matrixecho.MikeAgenda",
         ]
     }
 }

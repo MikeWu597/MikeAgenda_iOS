@@ -176,5 +176,17 @@ struct CourseListView: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .onTapGesture { editCourse = course }
+        .contextMenu {
+            Button {
+                editCourse = course
+            } label: {
+                Label("编辑", systemImage: "pencil")
+            }
+            Button(role: .destructive) {
+                Task { await viewModel.delete(course) }
+            } label: {
+                Label("删除", systemImage: "trash")
+            }
+        }
     }
 }

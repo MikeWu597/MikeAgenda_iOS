@@ -5,5 +5,6 @@ import SwiftUI
 struct CourseActivityWidgetBundle: WidgetBundle {
     var body: some Widget {
         CourseActivityWidget()
+        CourseScheduleWidget()
     }
 }

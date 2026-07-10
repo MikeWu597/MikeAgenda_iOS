@@ -347,6 +347,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7T69YP7U49;
+				CODE_SIGN_ENTITLEMENTS = MikeAgenda/MikeAgenda.entitlements;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
@@ -375,6 +376,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7T69YP7U49;
+				CODE_SIGN_ENTITLEMENTS = MikeAgenda/MikeAgenda.entitlements;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
@@ -401,6 +403,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7T69YP7U49;
+				CODE_SIGN_ENTITLEMENTS = CourseActivityWidget/CourseActivityWidget.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = CourseActivityWidgetInfo.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CourseActivityWidget;
@@ -429,6 +432,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7T69YP7U49;
+				CODE_SIGN_ENTITLEMENTS = CourseActivityWidget/CourseActivityWidget.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = CourseActivityWidgetInfo.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CourseActivityWidget;
