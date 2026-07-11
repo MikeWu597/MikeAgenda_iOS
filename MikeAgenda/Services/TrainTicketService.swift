@@ -3,11 +3,17 @@ import Combine
 
 @MainActor
 final class TrainTicketService: ObservableObject {
-    static let shared = TrainTicketService()
-
     @Published var tickets: [TrainTicket] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+
+    private let fromStation: String
+    private let toStation: String
+
+    init(from: String = "IOQ", to: String = "XJA") {
+        self.fromStation = from
+        self.toStation = to
+    }
 
     private let session: URLSession = {
         let config = URLSessionConfiguration.default
@@ -15,9 +21,6 @@ final class TrainTicketService: ObservableObject {
         config.timeoutIntervalForResource = 20
         return URLSession(configuration: config)
     }()
-
-    private let fromStation = "IOQ"
-    private let toStation = "XJA"
 
     private var cookiesReady = false
     private var trainCodeMap: [String: String] = [:]
@@ -30,7 +33,7 @@ final class TrainTicketService: ObservableObject {
             let df = DateFormatter()
             df.dateFormat = "yyyy-MM-dd"
             let dateKey = df.string(from: date)
-            let cacheKey = "train_cache_\(dateKey)"
+            let cacheKey = "train_cache_\(fromStation)_\(toStation)_\(dateKey)"
 
             if let cached = UserDefaults.standard.data(forKey: cacheKey) {
                 if trainCodeMapDate != dateKey {
@@ -58,6 +61,45 @@ final class TrainTicketService: ObservableObject {
         }
     }
 
+    func fetchGateInfo(trainCode: String, date: Date = Date()) async -> String? {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        let dateStr = df.string(from: date)
+
+        guard let url = URL(string: "https://www.12306.cn/index/otn/index12306/queryTicketCheck") else { return nil }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded; charset=UTF-8", forHTTPHeaderField: "Content-Type")
+        request.setValue("https://www.12306.cn/index/view/infos/ticket_check.html", forHTTPHeaderField: "Referer")
+        request.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+
+        if let kyfwCookies = session.configuration.httpCookieStorage?.cookies(for: URL(string: "https://kyfw.12306.cn/otn/")!) {
+            let cookieHeader = kyfwCookies.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
+            request.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
+        }
+
+        var components = URLComponents()
+        components.queryItems = [
+            URLQueryItem(name: "trainDate", value: dateStr),
+            URLQueryItem(name: "station_train_code", value: trainCode),
+            URLQueryItem(name: "from_station_telecode", value: fromStation),
+        ]
+        request.httpBody = components.percentEncodedQuery?.data(using: .utf8)
+
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200,
+                  let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let innerData = json["data"] as? [String: Any],
+                  var platform = innerData["trainPlatform"] as? String else { return nil }
+            platform = platform.replacingOccurrences(of: "检票口", with: "")
+            return platform.isEmpty ? nil : platform
+        } catch {
+            return nil
+        }
+    }
+
     private func obtainCookies() async throws {
         let url = URL(string: "https://kyfw.12306.cn/otn/leftTicket/init")!
         var request = URLRequest(url: url)
@@ -77,7 +119,6 @@ final class TrainTicketService: ObservableObject {
         let (data, _) = try await session.data(for: request)
         guard var text = String(data: data, encoding: .utf8) else { return }
 
-        // Strip "var train_list =" prefix
         if let range = text.range(of: "=") {
             text = String(text[text.index(after: range.lowerBound)...]).trimmingCharacters(in: .whitespaces)
         }
@@ -90,7 +131,6 @@ final class TrainTicketService: ObservableObject {
             for train in trainList {
                 guard let code = train["station_train_code"],
                       let no = train["train_no"] else { continue }
-                // Strip "(深圳北-香港西九龙)" suffix
                 let display = code.components(separatedBy: "(").first ?? code
                 map[no] = display
             }
@@ -141,8 +181,8 @@ final class TrainTicketService: ObservableObject {
         }
 
         return tickets.filter { ticket in
-            (ticket.fromStation.contains("深圳北") || ticket.fromStation == "IOQ") &&
-            (ticket.toStation.contains("香港西九龙") || ticket.toStation.contains("西九龙") || ticket.toStation == "XJA")
+            (ticket.fromStation.contains(normalizeStation(fromStation)) || ticket.fromStation == fromStation) &&
+            (ticket.toStation.contains(normalizeStation(toStation)) || ticket.toStation == toStation)
         }
     }
 

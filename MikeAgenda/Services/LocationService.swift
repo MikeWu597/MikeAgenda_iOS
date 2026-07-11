@@ -67,9 +67,7 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
         isInShenzhen = inSZ
         locationChecked = true
         UserDefaults.standard.set(inSZ, forKey: cacheKey)
-        if isTracking {
-            currentLocation = loc
-        }
+        currentLocation = loc
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {

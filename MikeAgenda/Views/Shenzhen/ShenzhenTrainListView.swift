@@ -1,23 +1,19 @@
 import SwiftUI
 import Combine
-import CoreLocation
 
-struct HongKongTrainListView: View {
-    @StateObject private var service = TrainTicketService(from: "IOQ", to: "XJA")
-    @ObservedObject private var locationService = LocationService.shared
+struct ShenzhenTrainListView: View {
+    @StateObject private var service = TrainTicketService(from: "XJA", to: "IOQ")
     @State private var selectedTrain: TrainTicket?
     @State private var showList = false
     @State private var now = Date()
-    @State private var arrivedCPs: Set<Int> = []
     @State private var gateInfo: String?
     @State private var fetchingGate = false
+    @State private var mtrStatus: MTRTrainStatus?
+    @State private var fetchingMTR = false
+    @State private var mtrTick = 0
+    @State private var completedCPs: Set<String> = []
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-
-    private let cpCoords: [CLLocationCoordinate2D] = [
-        CLLocationCoordinate2D(latitude: 22.612176, longitude: 114.028875),
-        CLLocationCoordinate2D(latitude: 22.610385, longitude: 114.030083),
-    ]
 
     var body: some View {
         Group {
@@ -53,11 +49,16 @@ struct HongKongTrainListView: View {
                 content
             }
         }
-        .navigationTitle("深圳北 → 香港西九龙")
+        .navigationTitle("香港西九龙 → 深圳北")
         .navigationBarTitleDisplayMode(.inline)
         .onReceive(timer) { _ in
             now = Date()
-            checkArrival()
+            mtrTick += 1
+            if isMTRPrimary && mtrTick % 5 == 0 {
+                Task {
+                    mtrStatus = try? await APIClient.shared.fetchMTRToAustin()
+                }
+            }
             if showGate && gateInfo == nil && !fetchingGate, let train = selectedTrain {
                 fetchingGate = true
                 Task {
@@ -78,12 +79,7 @@ struct HongKongTrainListView: View {
             }
             gateInfo = nil
             fetchingGate = false
-            arrivedCPs = []
-            preFilterByLocation()
-            locationService.startTracking()
-        }
-        .onDisappear {
-            locationService.stopTracking()
+            completedCPs = []
         }
         .sheet(isPresented: $showList) {
             NavigationStack {
@@ -98,6 +94,9 @@ struct HongKongTrainListView: View {
                 trainSelector(train: train)
                 Spacer()
                 countdownView(train: train)
+                if isMTRPrimary {
+                    mtrInfoView
+                }
                 if showGate {
                     gateInfoView
                 }
@@ -108,10 +107,33 @@ struct HongKongTrainListView: View {
         .padding(.bottom, 20)
     }
 
+    private var mtrCountdownMinutes: Int {
+        guard let train = selectedTrain,
+              let departure = departureDate(train) else { return 999 }
+        let remaining = departure.addingTimeInterval(-29 * 60).timeIntervalSince(now)
+        return max(0, Int(remaining / 60))
+    }
     private var showGate: Bool {
         guard let train = selectedTrain else { return false }
         let departure = departureDate(train) ?? Date()
-        return arrivedCPs.contains(0) || departure.addingTimeInterval(-11 * 60).timeIntervalSince(now) <= 0
+        return departure.addingTimeInterval(-15 * 60).timeIntervalSince(now) <= 0
+    }
+
+    private var isMTRPrimary: Bool {
+        guard let train = selectedTrain else { return false }
+        let departure = departureDate(train) ?? Date()
+        let cpLabels: [(label: String, offset: TimeInterval)] = [
+            ("售票截止", -45 * 60),
+            ("MTR", -29 * 60),
+            ("进站截止", -15 * 60),
+            ("停止检票", -4 * 60),
+        ]
+        for (label, offset) in cpLabels {
+            if !completedCPs.contains(label) && departure.addingTimeInterval(offset).timeIntervalSince(now) > 0 {
+                return label == "MTR"
+            }
+        }
+        return false
     }
 
     private var gateInfoView: some View {
@@ -127,6 +149,28 @@ struct HongKongTrainListView: View {
                 .font(.body)
                 .foregroundColor(.secondary)
         }
+    }
+
+    private var mtrInfoView: some View {
+        VStack(spacing: 4) {
+            if let mtr = mtrStatus {
+                let urgent = mtrCountdownMinutes < (Int(mtr.minutes) ?? 999)
+                HStack(alignment: .bottom, spacing: 8) {
+                    Text(mtr.minutes)
+                        .font(.system(size: 64, weight: .bold, design: .monospaced))
+                        .foregroundColor(urgent ? .red : .primary)
+                    Text("分钟")
+                        .font(.headline)
+                }
+                Text("红磡 → 柯士甸")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } else {
+                ProgressView()
+                    .scaleEffect(0.8)
+            }
+        }
+        .padding(.vertical, 8)
     }
 
     // MARK: - Train Selector
@@ -163,7 +207,6 @@ struct HongKongTrainListView: View {
     private struct CP {
         let label: String
         let deadline: Date
-        let index: Int
     }
 
     private func countdownView(train: TrainTicket) -> some View {
@@ -174,14 +217,13 @@ struct HongKongTrainListView: View {
         }
 
         let checkpoints = [
-            CP(label: "控制点1", deadline: departure.addingTimeInterval(-11 * 60), index: 0),
-            CP(label: "控制点2", deadline: departure.addingTimeInterval(-6.5 * 60), index: 1),
-            CP(label: "停止检票", deadline: departure.addingTimeInterval(-4 * 60), index: 2),
+            CP(label: "售票截止", deadline: departure.addingTimeInterval(-45 * 60)),
+            CP(label: "MTR", deadline: departure.addingTimeInterval(-29 * 60)),
+            CP(label: "进站截止", deadline: departure.addingTimeInterval(-15 * 60)),
+            CP(label: "停止检票", deadline: departure.addingTimeInterval(-4 * 60)),
         ]
 
-        let active = checkpoints.filter { cp in
-            cp.deadline.timeIntervalSince(now) > 0 && !arrivedCPs.contains(cp.index)
-        }
+        let active = checkpoints.filter { $0.deadline.timeIntervalSince(now) > 0 && !completedCPs.contains($0.label) }
 
         if active.isEmpty {
             return AnyView(
@@ -196,86 +238,34 @@ struct HongKongTrainListView: View {
                 ForEach(Array(active.enumerated()), id: \.offset) { idx, cp in
                     let remaining = cp.deadline.timeIntervalSince(now)
                     let isFirst = idx == 0
-                    let isGate = cp.index == 2
+                    let isGate = cp.label == "停止检票"
 
                     VStack(spacing: 2) {
-                        Text(countdownText(max(remaining, 0)))
-                            .font(.system(size: isFirst ? 64 : 36, weight: .bold, design: .monospaced))
-                            .foregroundColor(clockColor(cp: cp, remaining: remaining))
-                            .contentTransition(.numericText())
-                            .animation(.default, value: countdownText(max(remaining, 0)))
+                        HStack(alignment: .bottom, spacing: 4) {
+                            Text(countdownText(max(remaining, 0)))
+                                .font(.system(size: isFirst ? 64 : 36, weight: .bold, design: .monospaced))
+                                .foregroundColor(isFirst ? .blue : .secondary)
+                                .contentTransition(.numericText())
+                                .animation(.default, value: countdownText(max(remaining, 0)))
+
+                            if isFirst && !isGate {
+                                Button {
+                                    completedCPs.insert(cp.label)
+                                } label: {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.title2)
+                                        .foregroundColor(.green)
+                                }
+                            }
+                        }
 
                         Text(cp.label)
                             .font(isFirst ? .body : .subheadline)
                             .foregroundColor(isFirst ? .secondary : .secondary.opacity(0.7))
-
-                        if !isGate, let speed = speedTo(cp.index, remaining: remaining) {
-                            Text(speedText(speed))
-                                .font(.system(size: isFirst ? 14 : 12, weight: .medium))
-                                .foregroundColor(speedColor(speed))
-                        }
                     }
                 }
             }
         )
-    }
-
-    private func clockColor(cp: CP, remaining: TimeInterval) -> Color {
-        if cp.index == 2 { return .secondary }
-        guard let speed = speedTo(cp.index, remaining: remaining) else { return .orange }
-        return speedColor(speed)
-    }
-
-    private func speedColor(_ speed: Double) -> Color {
-        if speed < 1.5 { return .green }
-        if speed < 2.5 { return .orange }
-        return .red
-    }
-
-    private func speedText(_ speed: Double) -> String {
-        String(format: "%.1f m/s", speed)
-    }
-
-    private func distanceTo(_ cpIndex: Int) -> CLLocationDistance {
-        guard cpIndex < cpCoords.count,
-              let loc = locationService.currentLocation else { return -1 }
-        let target = CLLocation(latitude: cpCoords[cpIndex].latitude, longitude: cpCoords[cpIndex].longitude)
-        return loc.distance(from: target)
-    }
-
-    private func speedTo(_ cpIndex: Int, remaining: TimeInterval) -> Double? {
-        guard remaining > 0 else { return nil }
-        let dist = distanceTo(cpIndex)
-        guard dist > 0 else { return nil }
-        return dist / remaining
-    }
-
-    private func preFilterByLocation() {
-        guard let loc = locationService.currentLocation else { return }
-        let lat = loc.coordinate.latitude
-        let lon = loc.coordinate.longitude
-
-        // Condition B (most restrictive): south of CP2 → hide both
-        // CP2: 22.610385, 114.030083
-        if lat < 22.610385 {
-            arrivedCPs = [0, 1]
-            return
-        }
-
-        // Condition A: east of CP1 AND west of CP2 → hide CP1
-        // CP1: 22.612176, 114.028875
-        if lon > 114.028875 && lon < 114.030083 {
-            arrivedCPs = [0]
-        }
-    }
-
-    private func checkArrival() {
-        for i in 0..<2 where !arrivedCPs.contains(i) {
-            let dist = distanceTo(i)
-            if dist > 0 && dist < 15 {
-                arrivedCPs.insert(i)
-            }
-        }
     }
 
     private func departureDate(_ train: TrainTicket) -> Date? {
@@ -334,8 +324,7 @@ struct HongKongTrainListView: View {
                     selectedTrain = ticket
                     gateInfo = nil
                     fetchingGate = false
-                    arrivedCPs = []
-                    preFilterByLocation()
+                    completedCPs = []
                     showList = false
                 } label: {
                     TicketRowView(ticket: ticket, isSelected: ticket.id == selectedTrain?.id)
@@ -393,6 +382,6 @@ private struct TicketRowView: View {
 
 #Preview {
     NavigationStack {
-        HongKongTrainListView()
+        ShenzhenTrainListView()
     }
 }

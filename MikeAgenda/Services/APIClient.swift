@@ -318,6 +318,22 @@ final class APIClient {
 
     func deleteChecklistItem(id: Int) async throws { try await delete("/api/deleteChecklistItem/\(id)") }
 
+    // MARK: - MTR
+
+    func fetchMTRToAustin() async throws -> MTRTrainStatus {
+        let data = try await get("/mtr/next-train-to-aus")
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let status = json["status"] as? String, status == "success",
+              let inner = json["data"] as? [String: Any],
+              let timeUntil = inner["timeUntilDeparture"] else {
+            throw APIError.decodingError(NSError(domain: "", code: 0))
+        }
+        let minutes = String(Int((timeUntil as? Double ?? Double("\(timeUntil)") ?? 0) / 60))
+        let depart = (inner["departHungHom"] as? String) ?? "--:--:--"
+        let arrive = (inner["actualArrivalAtAustin"] as? String) ?? "--:--:--"
+        return MTRTrainStatus(minutes: minutes, departTime: depart, arriveTime: arrive)
+    }
+
     // MARK: - Helpers
 
     private func applySession(to request: inout URLRequest) {

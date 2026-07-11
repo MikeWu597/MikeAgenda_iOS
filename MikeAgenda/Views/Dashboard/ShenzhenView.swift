@@ -20,6 +20,23 @@ struct ShenzhenView: View {
                         }
                     }
                 }
+
+                NavigationLink {
+                    ShenzhenTrainListView()
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "tram.fill")
+                            .foregroundStyle(.blue)
+                            .frame(width: 24)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("去深圳")
+                                .foregroundStyle(.primary)
+                            Text("香港西九龙 → 深圳北")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
             }
         }
         .navigationTitle("深圳")
