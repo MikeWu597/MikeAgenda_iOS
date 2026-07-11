@@ -74,6 +74,13 @@ struct ImageLimitResponse: Decodable {
 struct SystemStatusResponse: Decodable {
     let success: Bool
     let message: String?
+    let status: SystemStatusData?
+}
+
+struct SystemStatusData: Decodable {
+    let memoryUsage: String?
+    let systemTime: String?
+    let uptime: Int?
 }
 
 struct SimpleResponse: Decodable {

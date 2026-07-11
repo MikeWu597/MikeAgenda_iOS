@@ -283,9 +283,28 @@ final class APIClient {
         try await post("/api/setImageStorageLimit", body: ["limit": bytes])
     }
 
-    func getSystemStatus() async throws -> String {
+    func getSystemStatus() async throws -> SystemStatusData? {
         let data = try await get("/api/getSystemStatus")
-        return (try decoder.decode(SystemStatusResponse.self, from: data)).message ?? "未知"
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let status = json["status"] as? [String: Any] else {
+            return nil
+        }
+        let mem: String? = {
+            if let s = status["memoryUsage"] as? String { return s }
+            if let n = status["memoryUsage"] as? Double { return String(format: "%.1f", n) }
+            if let n = status["memoryUsage"] as? Int { return "\(n)" }
+            return nil
+        }()
+        let time: String? = {
+            if let s = status["systemTime"] as? String { return s }
+            if let n = status["systemTime"] as? Double { return String(format: "%.0f", n) }
+            return nil
+        }()
+        return SystemStatusData(
+            memoryUsage: mem,
+            systemTime: time,
+            uptime: status["uptime"] as? Int ?? (status["uptime"] as? Double).map { Int($0) }
+        )
     }
 
     // MARK: - Checklists

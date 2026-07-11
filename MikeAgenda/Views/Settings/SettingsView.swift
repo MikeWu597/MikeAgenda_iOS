@@ -3,10 +3,8 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var sessionService: SessionService
     @StateObject private var settings = SettingsService.shared
-    @State private var imageLimitMB = ""
     @State private var isLoading = false
     @State private var isSavingTeaching = false
-    @State private var isSavingImage = false
     @State private var showClearConfirmation = false
 
     var body: some View {
@@ -18,11 +16,6 @@ struct SettingsView: View {
                     Text(ConnectionProfileStore.load().domain)
                         .foregroundColor(.secondary)
                         .lineLimit(1)
-                }
-                Button(role: .destructive) {
-                    showClearConfirmation = true
-                } label: {
-                    Label("清除连接", systemImage: "trash")
                 }
             }
 
@@ -55,33 +48,24 @@ struct SettingsView: View {
                     }
             }
 
-            Section("图片") {
-                HStack {
-                    Text("图片存储限制（MB）")
-                    Spacer()
-                    TextField("MB", text: $imageLimitMB)
-                        .keyboardType(.numberPad)
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: 80)
-                }
-                Button {
-                    saveImageLimit()
-                } label: {
-                    HStack {
-                        if isSavingImage {
-                            ProgressView()
-                        }
-                        Text("保存图片限制")
-                    }
-                }
-            }
-
             Section {
                 NavigationLink("关于") {
                     AboutView()
                 }
                 NavigationLink("系统状态") {
                     SystemStatusView()
+                }
+            }
+
+            Section {
+                Button(role: .destructive) {
+                    showClearConfirmation = true
+                } label: {
+                    HStack {
+                        Image(systemName: "trash")
+                            .foregroundColor(.red)
+                        Text("清除连接")
+                    }
                 }
             }
         }
@@ -103,13 +87,6 @@ struct SettingsView: View {
         do {
             settings.isTeaching = try await APIClient.shared.getTeachingStatus()
         } catch { settings.isTeaching = false }
-
-        do {
-            let limit = try await APIClient.shared.getImageStorageLimit()
-            let mb = limit / (1024 * 1024)
-            imageLimitMB = mb > 0 ? "\(mb)" : ""
-        } catch { imageLimitMB = "" }
-
         isLoading = false
     }
 
@@ -118,15 +95,6 @@ struct SettingsView: View {
         Task {
             try? await APIClient.shared.setTeachingStatus(settings.isTeaching)
             await MainActor.run { isSavingTeaching = false }
-        }
-    }
-
-    private func saveImageLimit() {
-        guard let mb = Int(imageLimitMB), mb > 0 else { return }
-        isSavingImage = true
-        Task {
-            try? await APIClient.shared.setImageStorageLimit(bytes: mb * 1024 * 1024)
-            await MainActor.run { isSavingImage = false }
         }
     }
 }
