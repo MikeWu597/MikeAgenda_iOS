@@ -12,6 +12,9 @@ struct ShenzhenTrainListView: View {
     @State private var fetchingMTR = false
     @State private var mtrTick = 0
     @State private var completedCPs: Set<String> = []
+    @State private var portFlow: PortFlowData?
+    @State private var fetchingPortFlow = false
+    @State private var portFlowError: String?
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -66,6 +69,18 @@ struct ShenzhenTrainListView: View {
                     fetchingGate = false
                 }
             }
+            if showGate && portFlow == nil && !fetchingPortFlow {
+                fetchingPortFlow = true
+                portFlowError = nil
+                Task.detached { [service = PortAPIService.shared] in
+                    do {
+                        let flow = try await service.queryClearanceFlowToXJL()
+                        await MainActor.run { portFlow = flow; fetchingPortFlow = false }
+                    } catch {
+                        await MainActor.run { portFlowError = error.localizedDescription; fetchingPortFlow = false }
+                    }
+                }
+            }
         }
         .task {
             await service.fetchTickets()
@@ -80,6 +95,9 @@ struct ShenzhenTrainListView: View {
             gateInfo = nil
             fetchingGate = false
             completedCPs = []
+            portFlow = nil
+            fetchingPortFlow = false
+            portFlowError = nil
         }
         .sheet(isPresented: $showList) {
             NavigationStack {
@@ -99,6 +117,16 @@ struct ShenzhenTrainListView: View {
                 }
                 if showGate {
                     gateInfoView
+                    if let flow = portFlow {
+                        portFlowView(flow)
+                    } else if fetchingPortFlow {
+                        ProgressView("获取口岸信息...")
+                            .font(.caption)
+                    } else if let err = portFlowError {
+                        Text("口岸: \(err)")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
                 }
                 Spacer()
                 infoRow(train: train)
@@ -114,9 +142,8 @@ struct ShenzhenTrainListView: View {
         return max(0, Int(remaining / 60))
     }
     private var showGate: Bool {
-        guard let train = selectedTrain else { return false }
-        let departure = departureDate(train) ?? Date()
-        return departure.addingTimeInterval(-15 * 60).timeIntervalSince(now) <= 0
+        guard selectedTrain != nil else { return false }
+        return completedCPs.contains("进站截止") || (departureDate(selectedTrain!) ?? Date()).addingTimeInterval(-15 * 60).timeIntervalSince(now) <= 0
     }
 
     private var isMTRPrimary: Bool {
@@ -268,6 +295,16 @@ struct ShenzhenTrainListView: View {
         )
     }
 
+    private func portFlowView(_ flow: PortFlowData) -> some View {
+        VStack(spacing: 4) {
+            Text("≈\(flow.arrivalMinutes)分钟")
+                .font(.system(size: 64, weight: .bold, design: .monospaced))
+                .foregroundColor(flow.arrivalTransitSmooth == "畅通" ? .green : .orange)
+            Text("实时通关")
+                .font(.body)
+                .foregroundColor(.secondary)
+        }
+    }
     private func departureDate(_ train: TrainTicket) -> Date? {
         let df = DateFormatter()
         df.dateFormat = "yyyy-MM-dd"
@@ -325,6 +362,9 @@ struct ShenzhenTrainListView: View {
                     gateInfo = nil
                     fetchingGate = false
                     completedCPs = []
+                    portFlow = nil
+                    fetchingPortFlow = false
+                    portFlowError = nil
                     showList = false
                 } label: {
                     TicketRowView(ticket: ticket, isSelected: ticket.id == selectedTrain?.id)
