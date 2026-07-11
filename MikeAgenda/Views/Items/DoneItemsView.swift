@@ -22,6 +22,20 @@ struct DoneItemsView: View {
 
     var body: some View {
         List {
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.secondary)
+                TextField("搜索已完成事项", text: $searchText)
+                    .textFieldStyle(.plain)
+                if !searchText.isEmpty {
+                    Button { searchText = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+
             if isLoading {
                 HStack { Spacer(); ProgressView(); Spacer() }
             } else if filteredItems.isEmpty {
@@ -87,7 +101,6 @@ struct DoneItemsView: View {
                 }
             }
         }
-        .searchable(text: $searchText, prompt: "搜索已完成事项")
         .navigationTitle("已完成事项")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } }

@@ -8,6 +8,20 @@ struct ItemListView: View {
 
     var body: some View {
         List {
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.secondary)
+                TextField("搜索事项", text: $viewModel.searchText)
+                    .textFieldStyle(.plain)
+                if !viewModel.searchText.isEmpty {
+                    Button { viewModel.searchText = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+
             if let selected = viewModel.selectedCategory {
                 Section {
                     Button("清除分类筛选") {
@@ -36,7 +50,6 @@ struct ItemListView: View {
                 }
             }
         }
-        .searchable(text: $viewModel.searchText, prompt: "搜索事项")
         .navigationTitle("所有事项")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
