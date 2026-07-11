@@ -84,14 +84,12 @@ struct ShenzhenTrainListView: View {
         }
         .task {
             await service.fetchTickets()
-            if selectedTrain == nil, let first = service.tickets.first {
-                selectedTrain = first
-            }
+            if let best = firstPurchasable() { selectedTrain = best }
+            else if selectedTrain == nil { selectedTrain = service.tickets.first }
         }
         .onAppear {
-            if selectedTrain == nil, let first = service.tickets.first {
-                selectedTrain = first
-            }
+            if let best = firstPurchasable() { selectedTrain = best }
+            else if selectedTrain == nil { selectedTrain = service.tickets.first }
             gateInfo = nil
             fetchingGate = false
             completedCPs = []
@@ -135,6 +133,14 @@ struct ShenzhenTrainListView: View {
         .padding(.bottom, 20)
     }
 
+    private func firstPurchasable() -> TrainTicket? {
+        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd HH:mm"
+        let today = df.string(from: Date()).prefix(10)
+        return service.tickets.first { ticket in
+            guard let dep = df.date(from: "\(today) \(ticket.fromTime)") else { return false }
+            return dep.timeIntervalSinceNow > 45 * 60
+        }
+    }
     private var mtrCountdownMinutes: Int {
         guard let train = selectedTrain,
               let departure = departureDate(train) else { return 999 }

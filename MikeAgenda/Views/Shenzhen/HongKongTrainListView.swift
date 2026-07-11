@@ -68,13 +68,13 @@ struct HongKongTrainListView: View {
         }
         .task {
             await service.fetchTickets()
-            if selectedTrain == nil, let first = service.tickets.first {
-                selectedTrain = first
+            if selectedTrain == nil, let best = bestTrain() {
+                selectedTrain = best
             }
         }
         .onAppear {
-            if selectedTrain == nil, let first = service.tickets.first {
-                selectedTrain = first
+            if selectedTrain == nil, let best = bestTrain() {
+                selectedTrain = best
             }
             gateInfo = nil
             fetchingGate = false
@@ -276,6 +276,41 @@ struct HongKongTrainListView: View {
                 arrivedCPs.insert(i)
             }
         }
+    }
+
+    // Select best train based on GPS speed color: green > orange > red > fallback
+    private func bestTrain() -> TrainTicket? {
+        guard let loc = locationService.currentLocation else { return service.tickets.first }
+
+        var bestScore = Int.max
+        var best: TrainTicket?
+
+        for ticket in service.tickets {
+            guard let dep = departureDate(ticket) else { continue }
+            let checkpoints: [(Int, TimeInterval)] = [
+                (0, -11 * 60), (1, -6.5 * 60), (2, -4 * 60),
+            ]
+            // Find first active checkpoint
+            var score = 3 // default: fallback (red/no GPS)
+            for (idx, offset) in checkpoints {
+                if arrivedCPs.contains(idx) { continue }
+                if dep.addingTimeInterval(offset).timeIntervalSince(now) > 0 {
+                    // This is the primary checkpoint
+                    let remaining = dep.addingTimeInterval(offset).timeIntervalSince(now)
+                    if remaining > 0, let spd = speedTo(idx, remaining: remaining) {
+                        if spd < 1.5 { score = 0 }      // green
+                        else if spd < 2.5 { score = 1 } // orange
+                        else { score = 2 }              // red
+                    }
+                    break
+                }
+            }
+            if score < bestScore {
+                bestScore = score
+                best = ticket
+            }
+        }
+        return best ?? service.tickets.first
     }
 
     private func departureDate(_ train: TrainTicket) -> Date? {

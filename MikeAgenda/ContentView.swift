@@ -58,12 +58,16 @@ struct MainTabView: View {
                 Label("课表", systemImage: "calendar")
             }
 
-            if locationService.isInShenzhen {
+            if locationService.isInShenzhen || locationService.isInHongKong || locationService.manualCity != nil {
                 NavigationStack {
-                    ShenzhenView()
+                    if locationService.manualCity == "hk" || (locationService.manualCity == nil && locationService.isInHongKong) {
+                        HongKongView()
+                    } else {
+                        ShenzhenView()
+                    }
                 }
                 .tabItem {
-                    Label("深圳", systemImage: "building.2.fill")
+                    Label("服务", systemImage: "building.2.fill")
                 }
             }
 
@@ -86,27 +90,6 @@ struct MoreView: View {
                 NavigationLink { RenewalListView() } label: { Label("续订提醒", systemImage: "bell") }
                 NavigationLink { ProjectListView() } label: { Label("项目", systemImage: "folder") }
                 NavigationLink { ChecklistListView() } label: { Label("检查清单", systemImage: "checklist") }
-            }
-
-            Section("点餐") {
-                Button { openURL("https://csd.order.place/store/112871/mode/prekiosk?_aigens_source=scan&onpremise=true") } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "fork.knife")
-                            .foregroundStyle(.blue)
-                            .frame(width: 24)
-                        Text("学校点餐")
-                            .foregroundStyle(.primary)
-                    }
-                }
-                Button { openURL("https://h5.xiaonoodles.com/materialQrcodeId=1839797535331319808") } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "fork.knife")
-                            .foregroundStyle(.blue)
-                            .frame(width: 24)
-                        Text("遇见小面点餐")
-                            .foregroundStyle(.primary)
-                    }
-                }
             }
 
             Section {

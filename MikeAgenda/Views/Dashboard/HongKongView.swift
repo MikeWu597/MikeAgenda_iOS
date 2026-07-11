@@ -1,32 +1,13 @@
 import SwiftUI
 
-struct ShenzhenView: View {
+struct HongKongView: View {
     @ObservedObject private var locationService = LocationService.shared
 
-    private var showHK: Bool { locationService.manualCity == "hk" }
+    private var showSZ: Bool { locationService.manualCity == "sz" }
 
     var body: some View {
         List {
-            if showHK {
-                Section("交通") {
-                    NavigationLink {
-                        ShenzhenTrainListView()
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "tram.fill")
-                                .foregroundStyle(.blue)
-                                .frame(width: 24)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("去深圳")
-                                    .foregroundStyle(.primary)
-                                Text("香港西九龙 → 深圳北")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-                }
-            } else {
+            if showSZ {
                 Section("交通") {
                     NavigationLink {
                         HongKongTrainListView()
@@ -45,9 +26,49 @@ struct ShenzhenView: View {
                         }
                     }
                 }
+            } else {
+                Section("交通") {
+                    NavigationLink {
+                        ShenzhenTrainListView()
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "tram.fill")
+                                .foregroundStyle(.blue)
+                                .frame(width: 24)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("去深圳")
+                                    .foregroundStyle(.primary)
+                                Text("香港西九龙 → 深圳北")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Section("点餐") {
+                Button { openURL("https://csd.order.place/store/112871/mode/prekiosk?_aigens_source=scan&onpremise=true") } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "fork.knife")
+                            .foregroundStyle(.blue)
+                            .frame(width: 24)
+                        Text("学校点餐")
+                            .foregroundStyle(.primary)
+                    }
+                }
+                Button { openURL("https://h5.xiaonoodles.com/materialQrcodeId=1839797535331319808") } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "fork.knife")
+                            .foregroundStyle(.blue)
+                            .frame(width: 24)
+                        Text("遇见小面点餐")
+                            .foregroundStyle(.primary)
+                    }
+                }
             }
         }
-        .navigationTitle(showHK ? "香港" : "深圳")
+        .navigationTitle(showSZ ? "深圳" : "香港")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
@@ -81,8 +102,13 @@ struct ShenzhenView: View {
             }
         }
     }
+
+    private func openURL(_ urlString: String) {
+        guard let url = URL(string: urlString) else { return }
+        UIApplication.shared.open(url)
+    }
 }
 
 #Preview {
-    NavigationStack { ShenzhenView() }
+    NavigationStack { HongKongView() }
 }
