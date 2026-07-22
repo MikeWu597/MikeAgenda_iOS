@@ -25,6 +25,22 @@ struct HongKongView: View {
                             }
                         }
                     }
+                    NavigationLink {
+                        MTRDoorListView()
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "door.left.hand.open")
+                                .foregroundStyle(.teal)
+                                .frame(width: 24)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("MTR车门管理")
+                                    .foregroundStyle(.primary)
+                                Text("落马洲 → 上水 → 红磡")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
                 }
             } else {
                 Section("交通") {
@@ -39,6 +55,22 @@ struct HongKongView: View {
                                 Text("去深圳")
                                     .foregroundStyle(.primary)
                                 Text("香港西九龙 → 深圳北")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    NavigationLink {
+                        MTRDoorListView()
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "door.left.hand.open")
+                                .foregroundStyle(.teal)
+                                .frame(width: 24)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("MTR车门管理")
+                                    .foregroundStyle(.primary)
+                                Text("落马洲 → 上水 → 红磡")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }

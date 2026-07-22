@@ -188,8 +188,10 @@ final class APIClient {
         return (try decoder.decode(CyclesResponse.self, from: data)).cycles ?? []
     }
 
+    private struct TodayCyclesBody: Encodable { let date: String }
+
     func getTodayCycles(date: String) async throws -> [Cycle] {
-        let data = try await post("/api/getTodayCycles", body: ["date": date])
+        let data = try await post("/api/getTodayCycles", body: TodayCyclesBody(date: date))
         return (try decoder.decode(CyclesResponse.self, from: data)).cycles ?? []
     }
 
