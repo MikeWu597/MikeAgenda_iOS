@@ -32,13 +32,8 @@ struct HongKongView: View {
                             Image(systemName: "door.left.hand.open")
                                 .foregroundStyle(.teal)
                                 .frame(width: 24)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("MTR车门管理")
-                                    .foregroundStyle(.primary)
-                                Text("落马洲 → 上水 → 红磡")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
+                            Text("MTR车门管理")
+                                .foregroundStyle(.primary)
                         }
                     }
                 }
@@ -67,13 +62,8 @@ struct HongKongView: View {
                             Image(systemName: "door.left.hand.open")
                                 .foregroundStyle(.teal)
                                 .frame(width: 24)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("MTR车门管理")
-                                    .foregroundStyle(.primary)
-                                Text("落马洲 → 上水 → 红磡")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
+                            Text("MTR车门管理")
+                                .foregroundStyle(.primary)
                         }
                     }
                 }
