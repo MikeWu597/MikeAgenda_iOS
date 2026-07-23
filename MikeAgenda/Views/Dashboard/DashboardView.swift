@@ -219,6 +219,8 @@ struct SectionCard<Content: View>: View {
                 .stroke(.white.opacity(0.15), lineWidth: 0.5)
         )
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        // 网格同一行内卡片高度不一致时，靠上对齐而不是被拉伸
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 }
 
