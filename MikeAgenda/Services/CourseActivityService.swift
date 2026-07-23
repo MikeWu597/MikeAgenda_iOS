@@ -1,5 +1,7 @@
 import Foundation
+#if !targetEnvironment(macCatalyst)
 import ActivityKit
+#endif
 
 final class CourseActivityService {
     static let shared = CourseActivityService()
@@ -9,18 +11,23 @@ final class CourseActivityService {
     private init() {}
 
     func start() {
-        #if targetEnvironment(simulator)
+        // 实时活动仅 iOS/iPadOS 可用，macOS (Catalyst) 与模拟器下为空操作
+        #if targetEnvironment(simulator) || targetEnvironment(macCatalyst)
         return
-        #endif
+        #else
         fetchAndStart()
+        #endif
     }
 
     func stop() {
         courseTimer?.invalidate()
         courseTimer = nil
+        #if !targetEnvironment(macCatalyst)
         endAllActivities()
+        #endif
     }
 
+    #if !targetEnvironment(macCatalyst)
     private func fetchAndStart() {
         Task {
             guard let courses = try? await APIClient.shared.getCourses() else { return }
@@ -101,4 +108,5 @@ final class CourseActivityService {
             }
         }
     }
+    #endif
 }

@@ -1,3 +1,4 @@
+#if !targetEnvironment(macCatalyst)
 import ActivityKit
 import Foundation
 
@@ -10,3 +11,4 @@ struct CourseActivityAttributes: ActivityAttributes {
         var endTime: String
     }
 }
+#endif
