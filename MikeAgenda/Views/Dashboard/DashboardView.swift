@@ -225,19 +225,80 @@ struct SectionCard<Content: View>: View {
 }
 
 extension Color {
+    /// 解析后端保存的颜色字符串。
+    /// 后端 course_color 等字段是自由文本：网页端 Element Plus 取色器开启
+    /// show-alpha 时会保存为 rgba(r, g, b, a)，因此除十六进制外还需兼容
+    /// CSS rgb()/rgba() 写法。
     init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        let input = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let rgba = Color.parseRGBFunction(input) {
+            self.init(.sRGB, red: rgba.r, green: rgba.g, blue: rgba.b, opacity: rgba.a)
+            return
+        }
+
+        let digits = input.hasPrefix("#") ? String(input.dropFirst()) : input
         var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
+        guard Scanner(string: digits).scanHexInt64(&int) else {
+            self.init(.sRGB, red: 0, green: 0, blue: 0, opacity: 1)
+            return
+        }
         let a, r, g, b: UInt64
-        switch hex.count {
-        case 6:
+        switch digits.count {
+        case 3: // #rgb
+            r = ((int >> 8) & 0xF) * 17
+            g = ((int >> 4) & 0xF) * 17
+            b = (int & 0xF) * 17
+            a = 255
+        case 4: // #rgba
+            r = ((int >> 12) & 0xF) * 17
+            g = ((int >> 8) & 0xF) * 17
+            b = ((int >> 4) & 0xF) * 17
+            a = (int & 0xF) * 17
+        case 6: // #rrggbb
             (a, r, g, b) = (255, (int >> 16) & 0xFF, (int >> 8) & 0xFF, int & 0xFF)
-        case 8:
-            (a, r, g, b) = ((int >> 24) & 0xFF, (int >> 16) & 0xFF, (int >> 8) & 0xFF, int & 0xFF)
+        case 8: // #rrggbbaa（CSS hex8，alpha 在末尾）
+            (r, g, b, a) = ((int >> 24) & 0xFF, (int >> 16) & 0xFF, (int >> 8) & 0xFF, int & 0xFF)
         default:
             (a, r, g, b) = (255, 0, 0, 0)
         }
         self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: Double(a) / 255)
+    }
+
+    /// 解析 CSS rgb()/rgba() 函数，兼容逗号分隔与空格/斜杠分隔、百分比分量。
+    private static func parseRGBFunction(_ input: String) -> (r: Double, g: Double, b: Double, a: Double)? {
+        let lower = input.lowercased()
+        guard lower.hasPrefix("rgb"),
+              let open = lower.firstIndex(of: "("),
+              let close = lower.lastIndex(of: ")"),
+              open < close else { return nil }
+        let inner = lower[lower.index(after: open)..<close]
+        let tokens = inner
+            .replacingOccurrences(of: "/", with: " ")
+            .replacingOccurrences(of: ",", with: " ")
+            .split(separator: " ")
+            .map(String.init)
+        guard tokens.count >= 3,
+              let r = colorComponent(tokens[0]),
+              let g = colorComponent(tokens[1]),
+              let b = colorComponent(tokens[2]) else { return nil }
+        let a = tokens.count >= 4 ? (alphaComponent(tokens[3]) ?? 1) : 1
+        return (r, g, b, a)
+    }
+
+    private static func colorComponent(_ token: String) -> Double? {
+        if token.hasSuffix("%"), let value = Double(token.dropLast()) {
+            return min(max(value / 100, 0), 1)
+        }
+        guard let value = Double(token) else { return nil }
+        return min(max(value / 255, 0), 1)
+    }
+
+    private static func alphaComponent(_ token: String) -> Double? {
+        if token.hasSuffix("%"), let value = Double(token.dropLast()) {
+            return min(max(value / 100, 0), 1)
+        }
+        guard let value = Double(token) else { return nil }
+        return min(max(value, 0), 1)
     }
 }
