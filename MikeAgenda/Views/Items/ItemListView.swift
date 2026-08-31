@@ -35,7 +35,7 @@ struct ItemListView: View {
             } else if viewModel.filteredItems.isEmpty {
                 EmptyStateView(icon: "tray", message: "暂无待办事项", action: { showCreate = true }, actionLabel: "创建事项")
             } else {
-                ForEach(viewModel.pagedItems) { item in
+                ForEach(viewModel.filteredItems) { item in
                     itemRow(item)
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) {
