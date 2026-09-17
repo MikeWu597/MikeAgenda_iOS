@@ -1,4 +1,5 @@
 import SwiftUI
+import Photos
 
 struct LoadingOverlay: View {
     var body: some View {
@@ -92,6 +93,22 @@ struct ServiceToolsSection: View {
     var body: some View {
         Section("工具") {
             NavigationLink {
+                CheckInToolView()
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "camera.viewfinder")
+                        .foregroundStyle(.orange)
+                        .frame(width: 24)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("打卡")
+                            .foregroundStyle(.primary)
+                        Text("拍照并叠加时间地点水印")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            NavigationLink {
                 WatermarkToolView()
             } label: {
                 HStack(spacing: 12) {
@@ -122,5 +139,81 @@ struct CountBadge: View {
             .padding(.vertical, 2)
             .background(.blue)
             .clipShape(Capsule())
+    }
+}
+
+// MARK: - 系统分享面板（含水印工具 / 打卡共用的「保存到相册」动作）
+
+struct ActivityView: UIViewControllerRepresentable {
+    let items: [Any]
+    let isVideo: Bool
+    var onSaveToPhotos: ((Bool, String?) -> Void)?
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let save = SaveToPhotosActivity()
+        save.isVideo = isVideo
+        save.onResult = onSaveToPhotos
+        let vc = UIActivityViewController(activityItems: items, applicationActivities: [save])
+        if let popover = vc.popoverPresentationController {
+            popover.sourceView = vc.view
+            popover.sourceRect = CGRect(
+                x: UIScreen.main.bounds.width / 2,
+                y: UIScreen.main.bounds.height / 2,
+                width: 0, height: 0
+            )
+            popover.permittedArrowDirections = []
+        }
+        return vc
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+/// 分享面板中的自定义「保存到相册」动作
+final class SaveToPhotosActivity: UIActivity {
+    var isVideo = false
+    var onResult: ((Bool, String?) -> Void)?
+    private var fileURL: URL?
+
+    override var activityTitle: String? { "保存到相册" }
+
+    override var activityImage: UIImage? {
+        UIImage(systemName: "square.and.arrow.down")
+    }
+
+    override var activityType: UIActivity.ActivityType? {
+        UIActivity.ActivityType("cn.matrixecho.MikeAgenda.saveToPhotos")
+    }
+
+    override class var activityCategory: UIActivity.Category { .action }
+
+    override func canPerform(withActivityItems activityItems: [Any]) -> Bool {
+        activityItems.contains { $0 is URL }
+    }
+
+    override func prepare(withActivityItems activityItems: [Any]) {
+        fileURL = activityItems.compactMap { $0 as? URL }.first
+    }
+
+    override func perform() {
+        guard let fileURL else {
+            activityDidFinish(false)
+            return
+        }
+        PHPhotoLibrary.shared().performChanges {
+            if self.isVideo {
+                PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: fileURL)
+            } else {
+                PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: fileURL)
+            }
+        } completionHandler: { success, error in
+            DispatchQueue.main.async {
+                self.activityDidFinish(success)
+                // 等分享面板完全关闭后再回调，避免结果提示被吞掉
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    self.onResult?(success, error?.localizedDescription)
+                }
+            }
+        }
     }
 }

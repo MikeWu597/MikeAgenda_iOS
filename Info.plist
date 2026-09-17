@@ -24,6 +24,8 @@
     <string>用于判断是否在深圳地区</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>用于将添加水印后的图片或视频保存到相册</string>
+    <key>NSCameraUsageDescription</key>
+    <string>用于拍摄打卡照片</string>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsArbitraryLoads</key>

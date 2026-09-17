@@ -1,6 +1,5 @@
 import SwiftUI
 import PhotosUI
-import Photos
 import AVKit
 import AVFoundation
 import UniformTypeIdentifiers
@@ -446,82 +445,6 @@ struct PickedVideoFile: Transferable {
             try? FileManager.default.removeItem(at: tmp)
             try FileManager.default.copyItem(at: received.file, to: tmp)
             return PickedVideoFile(url: tmp)
-        }
-    }
-}
-
-// MARK: - 系统分享面板
-
-private struct ActivityView: UIViewControllerRepresentable {
-    let items: [Any]
-    let isVideo: Bool
-    var onSaveToPhotos: ((Bool, String?) -> Void)?
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        let save = SaveToPhotosActivity()
-        save.isVideo = isVideo
-        save.onResult = onSaveToPhotos
-        let vc = UIActivityViewController(activityItems: items, applicationActivities: [save])
-        if let popover = vc.popoverPresentationController {
-            popover.sourceView = vc.view
-            popover.sourceRect = CGRect(
-                x: UIScreen.main.bounds.width / 2,
-                y: UIScreen.main.bounds.height / 2,
-                width: 0, height: 0
-            )
-            popover.permittedArrowDirections = []
-        }
-        return vc
-    }
-
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
-}
-
-/// 分享面板中的自定义「保存到相册」动作
-private final class SaveToPhotosActivity: UIActivity {
-    var isVideo = false
-    var onResult: ((Bool, String?) -> Void)?
-    private var fileURL: URL?
-
-    override var activityTitle: String? { "保存到相册" }
-
-    override var activityImage: UIImage? {
-        UIImage(systemName: "square.and.arrow.down")
-    }
-
-    override var activityType: UIActivity.ActivityType? {
-        UIActivity.ActivityType("cn.matrixecho.MikeAgenda.saveToPhotos")
-    }
-
-    override class var activityCategory: UIActivity.Category { .action }
-
-    override func canPerform(withActivityItems activityItems: [Any]) -> Bool {
-        activityItems.contains { $0 is URL }
-    }
-
-    override func prepare(withActivityItems activityItems: [Any]) {
-        fileURL = activityItems.compactMap { $0 as? URL }.first
-    }
-
-    override func perform() {
-        guard let fileURL else {
-            activityDidFinish(false)
-            return
-        }
-        PHPhotoLibrary.shared().performChanges {
-            if self.isVideo {
-                PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: fileURL)
-            } else {
-                PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: fileURL)
-            }
-        } completionHandler: { success, error in
-            DispatchQueue.main.async {
-                self.activityDidFinish(success)
-                // 等分享面板完全关闭后再回调，避免结果提示被吞掉
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                    self.onResult?(success, error?.localizedDescription)
-                }
-            }
         }
     }
 }
