@@ -1,9 +1,9 @@
 import SwiftUI
 import PhotosUI
+import Photos
 import AVKit
 import AVFoundation
 import UniformTypeIdentifiers
-import CoreText
 
 // MARK: - 水印样式参数
 
@@ -29,14 +29,22 @@ struct WatermarkTiledOverlay: View {
             let text = style.trimmedText
             guard !text.isEmpty else { return }
 
-            let resolved = ctx.resolve(
-                Text(text)
-                    .font(.system(size: CGFloat(style.fontSize), weight: .medium))
-                    .foregroundStyle(style.color.opacity(style.opacity))
-            )
-            let textSize = resolved.measure(in: CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude))
-            let stepX = textSize.width + CGFloat(style.spacing)
-            let stepY = textSize.height + CGFloat(style.spacing)
+            // 多行水印：逐行 resolve，手动垂直堆叠并居中
+            let font = Font.system(size: CGFloat(style.fontSize), weight: .medium)
+            let lines = text.components(separatedBy: "\n")
+            let resolvedLines = lines.map {
+                ctx.resolve(Text($0).font(font).foregroundStyle(style.color.opacity(style.opacity)))
+            }
+            let maxSize = CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+            let lineSizes = resolvedLines.map { $0.measure(in: maxSize) }
+            let lineHeight = lineSizes.map(\.height).max() ?? 0
+            let lineSpacing = lineHeight * 0.25
+            let blockW = lineSizes.map(\.width).max() ?? 0
+            let blockH = lineHeight * CGFloat(resolvedLines.count)
+                + lineSpacing * CGFloat(max(resolvedLines.count - 1, 0))
+            let stepX = blockW + CGFloat(style.spacing)
+            let stepY = blockH + CGFloat(style.spacing)
+            guard stepX > 1, stepY > 1 else { return }
             let extent = hypot(size.width, size.height) + max(stepX, stepY)
 
             var layer = ctx
@@ -47,7 +55,11 @@ struct WatermarkTiledOverlay: View {
             while y <= extent / 2 {
                 var x = -extent / 2
                 while x <= extent / 2 {
-                    layer.draw(resolved, at: CGPoint(x: x, y: y), anchor: .center)
+                    for (i, line) in resolvedLines.enumerated() where !lines[i].isEmpty {
+                        let offsetY = -blockH / 2 + lineHeight / 2
+                            + CGFloat(i) * (lineHeight + lineSpacing)
+                        layer.draw(line, at: CGPoint(x: x, y: y + offsetY), anchor: .center)
+                    }
                     x += stepX
                 }
                 y += stepY
@@ -73,6 +85,7 @@ struct WatermarkToolView: View {
     @State private var exportProgress: Double?
     @State private var exportedFile: ExportedMediaFile?
     @State private var errorMessage: String?
+    @State private var saveNotice: String?
 
     private var hasMedia: Bool { image != nil || videoURL != nil }
     private var canExport: Bool { hasMedia && style.isValid && !isExporting }
@@ -110,7 +123,8 @@ struct WatermarkToolView: View {
             }
 
             Section {
-                TextField("水印内容", text: $style.text)
+                TextField("水印内容", text: $style.text, axis: .vertical)
+                    .lineLimit(1...6)
                 labeledSlider("字号", value: $style.fontSize, range: 14...96) { "\(Int($0))" }
                 labeledSlider("间距", value: $style.spacing, range: 24...320) { "\(Int($0))" }
                 labeledSlider("倾斜", value: $style.angle, range: -75...75) { "\(Int($0))°" }
@@ -148,7 +162,17 @@ struct WatermarkToolView: View {
         .navigationTitle("水印")
         .onChange(of: pickedItem) { _, item in loadMedia(item) }
         .sheet(item: $exportedFile) { file in
-            ActivityView(items: [file.url])
+            ActivityView(items: [file.url], isVideo: videoURL != nil) { success, error in
+                saveNotice = success ? "已保存到相册" : (error ?? "保存到相册失败")
+            }
+        }
+        .alert("提示", isPresented: Binding(
+            get: { saveNotice != nil },
+            set: { if !$0 { saveNotice = nil } }
+        )) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text(saveNotice ?? "")
         }
         .alert("导出失败", isPresented: Binding(
             get: { errorMessage != nil },
@@ -347,7 +371,17 @@ struct WatermarkToolView: View {
         let spacing = CGFloat(style.spacing) * k
         let font = UIFont.systemFont(ofSize: fontSize, weight: .medium)
         let text = style.trimmedText
-        let textSize = (text as NSString).size(withAttributes: [.font: font])
+
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        let measureAttrs: [NSAttributedString.Key: Any] = [.font: font, .paragraphStyle: paragraph]
+        let bounds = (text as NSString).boundingRect(
+            with: CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: measureAttrs,
+            context: nil
+        )
+        let textSize = CGSize(width: ceil(bounds.width), height: ceil(bounds.height))
         let stepX = textSize.width + spacing
         let stepY = textSize.height + spacing
         let extent = hypot(size.width, size.height) + max(stepX, stepY)
@@ -365,19 +399,18 @@ struct WatermarkToolView: View {
         container.setAffineTransform(CGAffineTransform(rotationAngle: CGFloat(style.angle) * .pi / 180))
         container.masksToBounds = false
 
-        let cgColor = UIColor(style.color).withAlphaComponent(CGFloat(style.opacity)).cgColor
-        let tileW = ceil(textSize.width) + 4
-        let tileH = ceil(textSize.height) + 4
+        var drawAttrs = measureAttrs
+        drawAttrs[.foregroundColor] = UIColor(style.color).withAlphaComponent(CGFloat(style.opacity))
+        let attributedText = NSAttributedString(string: text, attributes: drawAttrs)
+        let tileW = textSize.width + 8
+        let tileH = textSize.height + 4
 
         var y: CGFloat = 0
         while y <= extent {
             var x: CGFloat = 0
             while x <= extent {
                 let t = CATextLayer()
-                t.string = text
-                t.font = CTFontCreateWithFontDescriptor(font.fontDescriptor, fontSize, nil)
-                t.fontSize = fontSize
-                t.foregroundColor = cgColor
+                t.string = attributedText
                 t.alignmentMode = .center
                 t.isWrapped = false
                 t.contentsScale = 2
@@ -421,9 +454,14 @@ struct PickedVideoFile: Transferable {
 
 private struct ActivityView: UIViewControllerRepresentable {
     let items: [Any]
+    let isVideo: Bool
+    var onSaveToPhotos: ((Bool, String?) -> Void)?
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        let vc = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        let save = SaveToPhotosActivity()
+        save.isVideo = isVideo
+        save.onResult = onSaveToPhotos
+        let vc = UIActivityViewController(activityItems: items, applicationActivities: [save])
         if let popover = vc.popoverPresentationController {
             popover.sourceView = vc.view
             popover.sourceRect = CGRect(
@@ -437,6 +475,55 @@ private struct ActivityView: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+/// 分享面板中的自定义「保存到相册」动作
+private final class SaveToPhotosActivity: UIActivity {
+    var isVideo = false
+    var onResult: ((Bool, String?) -> Void)?
+    private var fileURL: URL?
+
+    override var activityTitle: String? { "保存到相册" }
+
+    override var activityImage: UIImage? {
+        UIImage(systemName: "square.and.arrow.down")
+    }
+
+    override var activityType: UIActivity.ActivityType? {
+        UIActivity.ActivityType("cn.matrixecho.MikeAgenda.saveToPhotos")
+    }
+
+    override class var activityCategory: UIActivity.Category { .action }
+
+    override func canPerform(withActivityItems activityItems: [Any]) -> Bool {
+        activityItems.contains { $0 is URL }
+    }
+
+    override func prepare(withActivityItems activityItems: [Any]) {
+        fileURL = activityItems.compactMap { $0 as? URL }.first
+    }
+
+    override func perform() {
+        guard let fileURL else {
+            activityDidFinish(false)
+            return
+        }
+        PHPhotoLibrary.shared().performChanges {
+            if self.isVideo {
+                PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: fileURL)
+            } else {
+                PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: fileURL)
+            }
+        } completionHandler: { success, error in
+            DispatchQueue.main.async {
+                self.activityDidFinish(success)
+                // 等分享面板完全关闭后再回调，避免结果提示被吞掉
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    self.onResult?(success, error?.localizedDescription)
+                }
+            }
+        }
+    }
 }
 
 private enum WatermarkExportError: LocalizedError {
