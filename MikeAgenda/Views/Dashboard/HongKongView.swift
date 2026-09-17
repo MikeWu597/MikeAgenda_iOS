@@ -89,6 +89,8 @@ struct HongKongView: View {
                     }
                 }
             }
+
+            ServiceToolsSection()
         }
         .navigationTitle(showSZ ? "深圳" : "香港")
         .toolbar {

@@ -46,6 +46,8 @@ struct ShenzhenView: View {
                     }
                 }
             }
+
+            ServiceToolsSection()
         }
         .navigationTitle(showHK ? "香港" : "深圳")
         .toolbar {

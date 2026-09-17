@@ -87,6 +87,30 @@ struct ColorIndicator: View {
     }
 }
 
+/// 服务页通用的「工具」分组（深圳 / 香港均显示）
+struct ServiceToolsSection: View {
+    var body: some View {
+        Section("工具") {
+            NavigationLink {
+                WatermarkToolView()
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "text.below.photo.fill")
+                        .foregroundStyle(.purple)
+                        .frame(width: 24)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("水印")
+                            .foregroundStyle(.primary)
+                        Text("为图片或视频添加平铺水印")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+        }
+    }
+}
+
 struct CountBadge: View {
     let count: Int
 
