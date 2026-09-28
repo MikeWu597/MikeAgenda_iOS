@@ -11,6 +11,9 @@ struct MikeAgendaApp: App {
                 .environmentObject(sessionService)
                 .environmentObject(settingsService)
                 .preferredColorScheme(settingsService.effectiveColorScheme)
+                #if !targetEnvironment(macCatalyst)
+                .modifier(AlarmRootModifier())
+                #endif
         }
     }
 }

@@ -47,6 +47,16 @@ struct ShenzhenView: View {
                 }
             }
 
+            #if !targetEnvironment(macCatalyst)
+            Section("生活") {
+                NavigationLink {
+                    LocalAlarmListView()
+                } label: {
+                    Label("任务闹钟", systemImage: "alarm.fill")
+                }
+            }
+            #endif
+
             ServiceToolsSection()
         }
         .navigationTitle(showHK ? "香港" : "深圳")
